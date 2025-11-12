@@ -1,0 +1,13 @@
+# PlatformIO
+.pio
+
+# C++
+compile_commands.json*
+lib/esplp/include/config.h
+.cache/
+
+# Python
+.venv
+
+# Editor settings
+.vscode
