@@ -9,4 +9,6 @@
 #define MQTT_PASSWORD "<todo>"
 #define MQTT_PORT 1883
 
+#define ESP_BAUD_RATE 115200
+
 #endif
