@@ -1,12 +1,14 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <string.h>
 
 #include "HardwareSerial.h"
+#include "components_builder.h"
 #include "config.h"
+#include "device_builder.h"
 #include "ha_manager.h"
 #include "message_type.h"
 #include "mqtt_client.h"
+#include "origin_builder.h"
 #include "serial_communicator.h"
 #include "wifi_manager.h"
 #define CAPACITIVE_TOUCH_PIN 4
@@ -33,65 +35,49 @@ void createDevice() {
     Serial.println("Adding device");
 
     // =========== Initialize Device =========== //
-    HADevice device;
-
-    strncpy(device.ids, "something", sizeof(device.ids) - 1);
-    device.ids[16] = '\0';
-
-    strncpy(device.name, "Test Device", sizeof(device.name) - 1);
-    device.name[255] = '\0';
-
-    strncpy(device.mf, "Nicolas Saulnier Manufacturing", sizeof(device.mf) - 1);
-    device.name[255] = '\0';
-
-    strncpy(device.mdl, "Custom Model", sizeof(device.mdl) - 1);
-    device.mdl[31] = '\0';
+    DeviceBuilder deviceBuilder;
+    HADevice* device = deviceBuilder.withIds("multisensor_1")
+                           .withManufacturer("Nicolas Saulnier")
+                           .withModel("TemperatureHumidity")
+                           .withName("MultiSensor")
+                           .build();
 
     // =========== Initialize Origin =========== //
-    HAOrigin origin;
+    OriginBuilder originBuilder;
+    HAOrigin* origin = originBuilder.withName("Saulnier Software Solutions")
+                           .withSoftwareVersion("0.0.1-rcbeta")
+                           .withUrl("https://www.nsaulnier.com")
+                           .build();
 
-    strncpy(origin.name, "Nicolas Saulnier", sizeof(origin.name) - 1);
-    origin.name[255] = '\0';
+    // =========== Initialize Components =========== //
+    ComponentsBuilder componentsBuilder;
+    HAComponent* components = componentsBuilder.addComponent("temp1")
+                                  .withDeviceClass("temperature")
+                                  .withPlatform("sensor")
+                                  .withStateTopic("multisensor/temp/state")
+                                  .withUniqueId("multisensor_temp_1")
+                                  .withUnitOfMeasurement("°C")
+                                  .completeComponent()
+                                  .addComponent("hum1")
+                                  .withDeviceClass("humidity")
+                                  .withPlatform("sensor")
+                                  .withStateTopic("multisensor/hum/state")
+                                  .withUniqueId("multisensor_hum_1")
+                                  .withUnitOfMeasurement("%")
+                                  .completeComponent()
+                                  .build();
 
-    strncpy(origin.sw, "0.0.1-rcbeta", sizeof(origin.sw) - 1);
-    origin.sw[31] = '\0';
-
-    strncpy(origin.url, "https://www.nsaulnier.com", sizeof(origin.url) - 1);
-    origin.url[255] = '\0';
-
-    // =========== Initialize Component 1 Opts =========== //
-    HAComponentOptions cmp1opts;
-    strncpy(cmp1opts.p, "sensor", sizeof(cmp1opts.p) - 1);
-    cmp1opts.p[31] = '\0';
-
-    strncpy(cmp1opts.dev_cla, "temperature", sizeof(cmp1opts.dev_cla) - 1);
-    cmp1opts.dev_cla[31] = '\0';
-
-    strncpy(cmp1opts.uniq_id, "someid_sdfkljsdlsjfd",
-            sizeof(cmp1opts.uniq_id) - 1);
-    cmp1opts.uniq_id[16] = '\0';
-
-    strncpy(cmp1opts.stat_t, "lskdjflksdjflksdjflksdjkfsdf",
-            sizeof(cmp1opts.stat_t) - 1);
-    cmp1opts.stat_t[31] = '\0';
-
-    strncpy(cmp1opts.unit_of_meas, "°C", sizeof(cmp1opts.unit_of_meas) - 1);
-    cmp1opts.unit_of_meas[31] = '\0';
-
-    // =========== Initializing Components =========== //
-    HAComponent cmps[] = {
-        //{"temp1cmpID", cmp1opts},
-    };
-
-    // =========== Initializing Payload =========== //
     HADiscoveryPayload payload;
     payload.dev = device;
     payload.origin = origin;
-    payload.cmps = cmps;
-    payload.cmpCount = 0;
+    payload.cmps = components;
+    payload.cmpCount = 2;
 
-    // Send payload to home assistant
     homeAssistant.create_device(payload);
+
+    delete device;
+    delete origin;
+    delete[] components;
 }
 
 void setup() {
@@ -105,14 +91,13 @@ void setup() {
 
     wifiManager.connect();
     mqttClient.connect();
-
-    char buffer[255];
-
-    createDevice();
-    Serial.print("Relaxing :)");
+    Serial.println("Waiting for input.");
 }
 
 void loop() {
+    mqttClient.check_connection();
+    wifiManager.check_connection();
+
     touchValue = touchRead(CAPACITIVE_TOUCH_PIN);
 
     // Check how long capacitive pin GPIO4 is touched and do

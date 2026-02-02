@@ -20,7 +20,7 @@ struct HAComponentOptions {
     char type[32] = "COMPONENT_OPTIONS";
     char p[32];             // platform
     char dev_cla[32];       // device_class
-    char uniq_id[17];       // unique_id -- uuid is typically 16 bytes long
+    char uniq_id[32];       // unique_id -- uuid is typically 16 bytes long
     char stat_t[32];        // state_topic
     char unit_of_meas[32];  // unit_of_measurement
 };
@@ -39,10 +39,10 @@ struct HAComponent {
 
 struct HADiscoveryPayload {
     char type[32] = "DISCOVERY_PAYLOAD";
-    HADevice dev;
-    HAOrigin origin;
-    HAComponent* cmps;  // pointer to the start of the cmps array
-    size_t cmpCount;    // count of cmps in the array
+    HADevice* dev = nullptr;
+    HAOrigin* origin = nullptr;
+    HAComponent* cmps = nullptr;  // pointer to the start of the cmps array
+    size_t cmpCount;              // count of cmps in the array
 };
 
 #endif

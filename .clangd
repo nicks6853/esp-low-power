@@ -1,4 +1,12 @@
 CompileFlags:
+  Add:
+    - -Iinclude/receiver
+    - -Iinclude/router
+    - -Iinclude/edge
+    - -Wpedantic
+    - -Wall
+    - -Wextra
+    - -Wstringop-truncation
   Remove:
     - -fstrict-volatile-bitfields
     - -fno-tree-switch-conversion
