@@ -1,10 +1,15 @@
 #include <Arduino.h>
 
+#include "BME280I2C.h"
 #include "config.h"
+#include "esp32-hal.h"
 #include "esplp_espnow_manager.h"
-#include "esplp_message.h"
+#include "message_type.h"
 
 EspNowManager* espNowManager;
+HADiscoveryPayload discoveryPayload;
+BME280I2C bme;
+unsigned long lastReading = 0;
 
 void callback(uint8_t* mac, uint8_t sendStatus) {
     Serial.printf("Last message sent status: %d", sendStatus);
@@ -22,9 +27,17 @@ void setup() {
 }
 
 void loop() {
-    espNowManager->autopair();
+    // espNowManager->autopair();
 
-    Serial.println("Sleeping 5 seconds...");
-    Serial.println("==================================================");
-    delay(5000);
+    unsigned long currentTime = millis();
+
+    if (currentTime - lastReading >= 60000) {
+        float temperature = bme.temp();
+        float humidity = bme.hum();
+
+        Serial.printf("Sensor read. Temperature: %.2f, Humidity: %.2f",
+                      temperature, humidity);
+
+        lastReading = currentTime;
+    }
 }

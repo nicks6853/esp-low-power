@@ -3,6 +3,6 @@
 
 #include <Arduino.h>
 
-const uint8_t MESSAGE_START = 0xAA;
-const uint8_t MESSAGE_END = 0xBB;
+const uint8_t MESSAGE_START = 0xFF;
+const uint8_t MESSAGE_END = 0xFE;
 #endif

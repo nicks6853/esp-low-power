@@ -3,7 +3,7 @@
 
 # C++
 compile_commands.json*
-lib/esplp/include/config.h
+include/common/config.h
 .cache/
 
 # Python
@@ -11,3 +11,5 @@ lib/esplp/include/config.h
 
 # Editor settings
 .vscode
+
+.ccls

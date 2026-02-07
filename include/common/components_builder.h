@@ -23,6 +23,7 @@ class ComponentBuilder {
     ComponentBuilder& withUniqueId(const char* uniqueId);
     ComponentBuilder& withStateTopic(const char* stateTopic);
     ComponentBuilder& withUnitOfMeasurement(const char* unitOfMeasurement);
+    ComponentBuilder& withName(const char* name);
     ComponentsBuilder& completeComponent();
 };
 

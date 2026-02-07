@@ -3,60 +3,59 @@
 #include <ArduinoJson.h>
 
 #include "ArduinoJson/Document/JsonDocument.hpp"
-#include "ArduinoJson/Object/JsonObject.hpp"
+#include "config.h"
+#include "message_type.h"
 #include "mqtt_client.h"
 
-uint8_t HAManager::create_device(HADiscoveryPayload haDiscoveryPayload) {
-    JsonDocument jsonPayload;
+/**
+ * @brief Publishes a discovery message to Home Assistant's MQTT integration
+ * @param discoveryPayload The discovery payload to send to HA
+ * @return a 1 indicating success, 0 indicating failure.
+ */
+uint8_t HAManager::discovery(HADiscoveryPayload discoveryPayload) {
+    JsonDocument jsonPayload = discoveryPayload.toJSON();
 
-    JsonObject dev = jsonPayload["dev"].to<JsonObject>();
-    dev["ids"] = haDiscoveryPayload.dev->ids;
-    dev["name"] = haDiscoveryPayload.dev->name;
-    dev["mf"] = haDiscoveryPayload.dev->mf;
-    dev["mdl"] = haDiscoveryPayload.dev->mdl;
+    char topic[255];
+    snprintf(topic, sizeof(topic), "%s/device/%s/config", HA_DISCOVERY_PREFIX,
+             discoveryPayload.dev->ids);
 
-    if (haDiscoveryPayload.origin != nullptr) {
-        JsonObject o = jsonPayload["o"].to<JsonObject>();
-        o["name"] = haDiscoveryPayload.origin->name;
-        o["sw"] = haDiscoveryPayload.origin->sw;
-        o["url"] = haDiscoveryPayload.origin->url;
-    }
-
-    if (haDiscoveryPayload.cmps != nullptr) {
-        JsonObject cmps = jsonPayload["cmps"].to<JsonObject>();
-
-        for (size_t i = 0; i < haDiscoveryPayload.cmpCount; i++) {
-            HAComponent component = haDiscoveryPayload.cmps[i];
-
-            const char* key = component.key;
-            HAComponentOptions value = component.value;
-
-            JsonObject currentObject = cmps[key].to<JsonObject>();
-            currentObject["p"] = value.p;
-            currentObject["dev_cla"] = value.dev_cla;
-            currentObject["uniq_id"] = value.uniq_id;
-            currentObject["stat_t"] = value.stat_t;
-            currentObject["unit_of_meas"] = value.unit_of_meas;
-        }
-    }
-
-    const char* topic = "homeassistant/device/somedevice1234/config";
-
+    // Create buffer of the size required to send the message
     size_t requiredSize = measureJson(jsonPayload);
 
-    size_t bufferSize = requiredSize + 16;
+    if (requiredSize > 1024) {
+        Serial.println(
+            "createDevice - jsonPayload too large! Maximum of 1024 bytes for "
+            "MQTT "
+            "PubSubClient");
+        return 0;
+    }
 
-    char* heapBuffer = new char[bufferSize];
+    /**
+     * Allocate buffer to store the serialized JSON
+     * payload before sending over MQTT. Add 1 for
+     * null terminator
+     */
+    char* heapBuffer = new char[requiredSize + 1];
 
     if (heapBuffer != nullptr) {
-        serializeJson(jsonPayload, heapBuffer, bufferSize);
-        heapBuffer[bufferSize - 1] =
-            '\0';  // Ensure null-terminated, even if we overflow
+        /**
+         * Not adding null-terminator since the heapBuffer size
+         * is calculated based on the JSON payload. serializeJson
+         * should have room to null terminate
+         */
+        serializeJson(jsonPayload, heapBuffer, requiredSize);
+        heapBuffer[requiredSize] = '\0';
 
-        Serial.printf("create_device - Sending message: \n");
+        Serial.printf("discovery - Sending message: \n");
         serializeJsonPretty(jsonPayload, Serial);
         Serial.println();
 
+        /**
+         * TODO: We will need to either publish the discovery message
+         * with the retain flag `this->_mqttClient.publish(topic, heapBuffer,
+         * true)` or subscribe to a specific topic from the device and republish
+         * when the mqtt broker comes back on
+         */
         this->_mqttClient.publish(topic, heapBuffer);
         delete[] heapBuffer;
 
@@ -64,7 +63,72 @@ uint8_t HAManager::create_device(HADiscoveryPayload haDiscoveryPayload) {
     }
 
     Serial.println(
-        "create_device - Failed to allocate memory for serializing JSON "
+        "discovery - Failed to allocate memory for serializing JSON "
         "payload");
     return 0;
+}
+
+/**
+ * @brief Publishes a state update to Home Assistant
+ * @param stateUpdate The state update message to publish.
+ * @return a 1 indicating success, 0 indicating failure.
+ */
+uint8_t HAManager::publishState(HAStateUpdate<float> stateUpdate) {
+    char strValue[64];
+
+    if (stateUpdate.valueType != ValueType::FLOAT_TYPE) {
+        Serial.println(
+            "publishState - function for float type called but state update is "
+            "not a float.");
+        return 0;
+    }
+
+    snprintf(strValue, sizeof(strValue), "%.4f", stateUpdate.value);
+    Serial.printf("Publishing state %s to topic %s\n", strValue,
+                  stateUpdate.topic);
+
+    this->_mqttClient.publish(stateUpdate.topic, strValue);
+    return 1;
+}
+
+uint8_t HAManager::publishState(HAStateUpdate<int32_t> stateUpdate) {
+    char strValue[64];
+
+    if (stateUpdate.valueType != ValueType::INT_TYPE) {
+        Serial.println(
+            "publishState - function for int type called but state update is "
+            "not an int.");
+        return 0;
+    }
+
+    snprintf(strValue, sizeof(strValue), "%ud", stateUpdate.value);
+    Serial.printf("Publishing state %s to topic %s\n", strValue,
+                  stateUpdate.topic);
+
+    this->_mqttClient.publish(stateUpdate.topic, strValue);
+    return 1;
+}
+
+uint8_t HAManager::publishState(HAStateUpdate<bool> stateUpdate) {
+    if (stateUpdate.valueType != ValueType::BOOL_TYPE) {
+        Serial.println(
+            "publishState - function for bool type called but state update is "
+            "not an bool.");
+        return 0;
+    }
+
+    char strValue[4];
+
+    if (stateUpdate.value) {
+        strncpy(strValue, "OFF", sizeof(strValue));
+    } else {
+        strncpy(strValue, "ON", sizeof(strValue));
+    }
+    strValue[sizeof(strValue) - 1] = '\0';
+
+    Serial.printf("Publishing state %s to topic %s\n", strValue,
+                  stateUpdate.topic);
+
+    this->_mqttClient.publish(stateUpdate.topic, strValue);
+    return 1;
 }

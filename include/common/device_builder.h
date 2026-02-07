@@ -1,5 +1,6 @@
 #ifndef DEVICEBUILDER_H
 #define DEVICEBUILDER_H
+
 #include "message_type.h"
 
 // Forward declaration of DeviceBuilder to enable access in other builders

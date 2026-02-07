@@ -143,6 +143,25 @@ ComponentBuilder& ComponentBuilder::withUnitOfMeasurement(
 }
 
 /**
+ * @brief Adds a name to the component
+ * @param name The name to assign to the component
+ * @return The ComponentBuilder instance
+ */
+ComponentBuilder& ComponentBuilder::withName(const char* name) {
+    if (strlen(name) >= sizeof(this->_componentOptions.name)) {
+        Serial.printf("withName - String too long");
+        return *this;
+    }
+
+    strncpy(this->_componentOptions.name, name,
+            sizeof(this->_componentOptions.name));
+    this->_componentOptions.name[sizeof(this->_componentOptions.name) - 1] =
+        '\0';
+
+    return *this;
+}
+
+/**
  * @brief Returns the built HAComponentOption and resets the builder.
  * @return A pointer to the built HAComponentOption on the heap.
  */

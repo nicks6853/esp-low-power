@@ -1,16 +1,13 @@
-clang
+/home/nick/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-gcc
 
 %c -Wno-frame-address -std=gnu99 -Wno-old-style-declaration -Wall -Wextra -Os -mlongcalls -ffunction-sections -fdata-sections -Wno-error=unused-function -Wno-error=unused-variable -Wno-error=deprecated-declarations -Wno-unused-parameter -Wno-sign-compare -ggdb -freorder-blocks -Wwrite-strings -fstack-protector -fstrict-volatile-bitfields -Wno-error=unused-but-set-variable -fno-jump-tables -fno-tree-switch-conversion -MMD
 %cpp -Wno-frame-address -std=gnu++11 -fexceptions -fno-rtti -Wall -Wextra -Os -mlongcalls -ffunction-sections -fdata-sections -Wno-error=unused-function -Wno-error=unused-variable -Wno-error=deprecated-declarations -Wno-unused-parameter -Wno-sign-compare -ggdb -freorder-blocks -Wwrite-strings -fstack-protector -fstrict-volatile-bitfields -Wno-error=unused-but-set-variable -fno-jump-tables -fno-tree-switch-conversion -MMD
 
 -I/home/nick/Documents/repo/esp-low-power/include
 -I/home/nick/Documents/repo/esp-low-power/src
--I/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src
--I/home/nick/Documents/repo/esp-low-power/lib/esplp/include
--I/home/nick/Documents/repo/esp-low-power/lib/esplp/src
--I/home/nick/Documents/repo/esp-low-power/.pio/libdeps/router/ArduinoJson/src
--I/home/nick/Documents/repo/esp-low-power/.pio/libdeps/router/PubSubClient/src
--I/home/nick/Documents/repo/esp-low-power/include/router
+-I/home/nick/Documents/repo/esp-low-power/.pio/libdeps/receiver/ArduinoJson/src
+-I/home/nick/Documents/repo/esp-low-power/include/common
+-I/home/nick/Documents/repo/esp-low-power/include/receiver
 -I/home/nick/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/newlib/platform_include
 -I/home/nick/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include
 -I/home/nick/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include/esp_additions/freertos
@@ -236,6 +233,7 @@ clang
 -I/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/USB/src
 -I/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/Update/src
 -I/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src
+-I/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src
 -I/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/WiFiClientSecure/src
 -I/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/WiFiProv/src
 -I/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src
@@ -245,7 +243,7 @@ clang
 -I/home/nick/.platformio/packages/toolchain-xtensa-esp32/lib/gcc/xtensa-esp32-elf/8.4.0/include-fixed
 -I/home/nick/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include
 
--DPLATFORMIO=60118
+-DPLATFORMIO=60119
 -DARDUINO_uPesy_WROOM
 -DHAVE_CONFIG_H
 -DMBEDTLS_CONFIG_FILE="mbedtls/esp_config.h"

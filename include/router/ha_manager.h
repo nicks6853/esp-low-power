@@ -12,6 +12,10 @@ class HAManager {
 
    public:
     HAManager(MqttClient& mqttClient) : _mqttClient(mqttClient) {};
-    uint8_t create_device(HADiscoveryPayload ha_discovery_payload);
+    uint8_t discovery(HADiscoveryPayload discoveryPayload);
+
+    uint8_t publishState(HAStateUpdate<float> stateUpdate);
+    uint8_t publishState(HAStateUpdate<bool> stateUpdate);
+    uint8_t publishState(HAStateUpdate<int32_t> stateUpdate);
 };
 #endif
