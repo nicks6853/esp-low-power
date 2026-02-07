@@ -47,11 +47,29 @@ void flushSerial() {
     Serial.println("Buffer flushed");
 }
 
+size_t getSizefromMessageType(MessageType type) {
+    switch (type) {
+        case MessageType::DEVICE:
+            return sizeof(HADevice);
+        case MessageType::COMPONENT_OPTIONS:
+            return sizeof(HAComponentOptions);
+        case MessageType::DISCOVERY_PAYLOAD:
+            return sizeof(HADiscoveryPayload);
+        case MessageType::ORIGIN:
+            return sizeof(HAOrigin);
+        default:
+            return 0;
+    }
+}
+
 void setup() {
     Serial2.begin(ESP_BAUD_RATE, SERIAL_8N1, RX2, TX2);
     Serial2.setTimeout(100);  // Set timeout to 100ms to prevent hanging too
                               // long if readBytes gets stuck
     Serial.begin(ESP_BAUD_RATE);
+
+    HAStateUpdate<float> data;
+    data.value = 2.0;
 
     while (!Serial || !Serial2);
     Serial.println("Serial ready!");

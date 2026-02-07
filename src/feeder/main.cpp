@@ -1,8 +1,6 @@
 #include <Arduino.h>
 
-#include "HardwareSerial.h"
 #include "config.h"
-#include "constants.h"
 #include "device_builder.h"
 #include "message_type.h"
 
@@ -10,16 +8,18 @@ void writeToSerial() {
     Serial.println("Writing to serial...");
 
     DeviceBuilder builder;
-    HADevice* device = builder.withIds("multisensor_1")
-                           .withManufacturer("Nicolas Saulnier")
-                           .withModel("TemperatureHumidity")
-                           .withName("MultiSensor")
-                           .build();
 
-    Serial1.write(MESSAGE_START);
-    Serial1.write((uint8_t)device->type);
-    Serial1.write((uint8_t*)device, sizeof(HADevice));
-    Serial1.write(MESSAGE_END);
+    HAStateUpdate<char[128]> stateUpdate;
+
+    const char* topic = "multisensor/temp/state";
+
+    strncpy(stateUpdate.topic, topic, sizeof(stateUpdate.topic));
+    stateUpdate.topic[sizeof(stateUpdate.topic) - 1] = '\0';
+
+    strncpy(stateUpdate.value, "SomeValue", sizeof(stateUpdate.value));
+    stateUpdate.value[sizeof(stateUpdate.value) - 1] = '\0';
+
+    stateUpdate.write(Serial1);
     Serial.println("Wrote to serial");
 }
 

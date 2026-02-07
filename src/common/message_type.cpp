@@ -2,6 +2,8 @@
 
 #include <ArduinoJson.h>
 
+#include "constants.h"
+
 /**
  * @brief Converts the object to a JSON document.
  * @return The JSON document (smart pointer)

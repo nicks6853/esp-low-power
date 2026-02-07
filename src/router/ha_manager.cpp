@@ -76,7 +76,7 @@ uint8_t HAManager::discovery(HADiscoveryPayload discoveryPayload) {
 uint8_t HAManager::publishState(HAStateUpdate<float> stateUpdate) {
     char strValue[64];
 
-    if (stateUpdate.valueType != ValueType::FLOAT_TYPE) {
+    if (stateUpdate.messageType != MessageType::STATE_UPDATE_FLOAT) {
         Serial.println(
             "publishState - function for float type called but state update is "
             "not a float.");
@@ -94,7 +94,7 @@ uint8_t HAManager::publishState(HAStateUpdate<float> stateUpdate) {
 uint8_t HAManager::publishState(HAStateUpdate<int32_t> stateUpdate) {
     char strValue[64];
 
-    if (stateUpdate.valueType != ValueType::INT_TYPE) {
+    if (stateUpdate.messageType != MessageType::STATE_UPDATE_INT) {
         Serial.println(
             "publishState - function for int type called but state update is "
             "not an int.");
@@ -110,7 +110,7 @@ uint8_t HAManager::publishState(HAStateUpdate<int32_t> stateUpdate) {
 }
 
 uint8_t HAManager::publishState(HAStateUpdate<bool> stateUpdate) {
-    if (stateUpdate.valueType != ValueType::BOOL_TYPE) {
+    if (stateUpdate.messageType != MessageType::STATE_UPDATE_BOOL) {
         Serial.println(
             "publishState - function for bool type called but state update is "
             "not an bool.");
