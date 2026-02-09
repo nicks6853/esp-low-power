@@ -39,14 +39,6 @@ void resetReaderState() {
     state = SerialState::WAIT;
 }
 
-void flushSerial() {
-    Serial.println("Flushing serial buffer...");
-    while (Serial2.available() > 0) {
-        Serial2.read();
-    }
-    Serial.println("Buffer flushed");
-}
-
 size_t getSizefromMessageType(MessageType type) {
     switch (type) {
         case MessageType::DEVICE:

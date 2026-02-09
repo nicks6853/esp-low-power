@@ -5,6 +5,15 @@
 #include "constants.h"
 
 /**
+ * @brief Destructor for HADiscoveryPayload
+ */
+HADiscoveryPayload::~HADiscoveryPayload() {
+    delete this->dev;
+    delete this->origin;
+    delete[] this->cmps;
+}
+
+/**
  * @brief Converts the object to a JSON document.
  * @return The JSON document (smart pointer)
  */
