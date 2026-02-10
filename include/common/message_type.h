@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 
+#include "config.h"
 #include "serializable.h"
 
 /**
@@ -21,7 +22,6 @@ enum class ValueType : uint8_t { INT, FLOAT, BOOL, CHAR_128 };
  * Represents a device in Home Assistant's MQTT integration
  */
 struct HADevice {
-    MessageType messageType = MessageType::DEVICE;
     char ids[17];    // deviceid -- uuid is typically 16 bytes long
     char name[256];  // name
     char mf[256];    // manufacturer
@@ -32,7 +32,6 @@ struct HADevice {
  * Represents a component in Home Assistant's MQTT integration.
  */
 struct HAComponentOptions {
-    MessageType messageType = MessageType::COMPONENT_OPTIONS;
     char p[32];             // platform
     char dev_cla[32];       // device_class
     char uniq_id[32];       // unique_id -- uuid is typically 16 bytes long
@@ -47,7 +46,6 @@ struct HAComponentOptions {
  * Represents an origin in Home Assistant's MQTT integration.
  */
 struct HAOrigin {
-    MessageType messageType = MessageType::ORIGIN;
     char name[256];  // name
     char sw[32];     // sw_version
     char url[256];   // support_url
@@ -69,14 +67,12 @@ struct HAComponent {
  * MQTT integration for automatic discovery of devices.
  */
 struct HADiscoveryPayload {
-    MessageType messageType = MessageType::DISCOVERY_PAYLOAD;
-    HADevice* dev = nullptr;
-    HAOrigin* origin = nullptr;
-    HAComponent* cmps = nullptr;  // pointer to the start of the cmps array
-    size_t cmpCount;              // count of cmps in the array
+    HADevice dev;
+    HAOrigin origin;
+    HAComponent cmps[HA_MAX_COMPONENT_PER_DEVICE];  // Array of the components
+    size_t cmpCount;  // count of cmps in the array
 
     JsonDocument toJSON();
-    ~HADiscoveryPayload();
 };
 
 /**
@@ -84,28 +80,25 @@ struct HADiscoveryPayload {
  * sensor wants to send to Home Assistant
  */
 template <typename T>
-struct HAStateTraits;
-
-template <>
-struct HAStateTraits<float> {
-    static constexpr MessageType messageType = MessageType::STATE_UPDATE_FLOAT;
-};
-
-template <>
-struct HAStateTraits<int> {
-    static constexpr MessageType messageType = MessageType::STATE_UPDATE_INT;
-};
-
-template <>
-struct HAStateTraits<char[128]> {
-    static constexpr MessageType messageType =
-        MessageType::STATE_UPDATE_CHAR_128;
-};
-
-template <typename T>
 struct HAStateUpdate {
-    MessageType messageType = HAStateTraits<T>::messageType;
     char topic[128];  // MQTT topic to publish state to
     T value;
+};
+
+/**
+ * Struct to represent a message that is sent from an edge device
+ * through the system.
+ */
+struct HAMessage {
+    MessageType messageType;
+    union {
+        HAStateUpdate<float> stateUpdateF;
+        HAStateUpdate<int> stateUpdateI;
+        HAStateUpdate<char[128]> stateUpdateS;
+        HADiscoveryPayload discovery;
+    };
+
+    HAMessage(MessageType msgType);
+    ~HAMessage();
 };
 #endif

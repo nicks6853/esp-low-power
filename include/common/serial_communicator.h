@@ -8,17 +8,6 @@
 
 enum SerialCommunicatorState { IDLE, WAIT_FOR_TYPE, READING };
 
-struct IncomingMessage {
-    MessageType type;
-    union {
-        HAStateUpdate<float>* floatData;
-        HAStateUpdate<int>* intData;
-        HAStateUpdate<char[128]>* charData;
-        HADiscoveryPayload* discoveryData;
-    };
-    ~IncomingMessage();
-};
-
 class SerialCommunicator {
    private:
     HardwareSerial& _serial;
@@ -32,13 +21,13 @@ class SerialCommunicator {
     void _reset();
     void _handleIdle();
     void _handleWaitForType();
-    IncomingMessage* _handleReading();
+    HAMessage* _handleReading();
 
    public:
     SerialCommunicator(HardwareSerial& serial) : _serial(serial) {};
 
     void write(const Serializable& body);
 
-    IncomingMessage* read();
+    HAMessage* read();
 };
 #endif

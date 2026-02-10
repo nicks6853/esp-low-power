@@ -28,26 +28,66 @@ void setup() {
 
     wifiManager.connect();
     mqttClient.connect();
+
+    Serial2.write(XON);
 }
 
 void loop() {
     unsigned long currentTime = millis();
 
     if (currentTime - lastPrint >= 1000) {
+        Serial.println(
+            "===============================================================");
         Serial.printf("HeapMemory: %d\n", ESP.getHeapSize());
+        Serial.println(
+            "===============================================================");
         lastPrint = currentTime;
     }
 
     mqttClient.check_connection();
     wifiManager.check_connection();
 
-    IncomingMessage* result = serialCommunicator.read();
+    HAMessage* result = serialCommunicator.read();
 
     if (result != nullptr) {
-        Serial.println("HAD A RESULT!");
-        Serial.printf("Result type: %d\n\ttopic: %s\n\tvalue: %.2f\n",
-                      (uint8_t)result->type, result->floatData->topic,
-                      result->floatData->value);
+        // Send XOFF signal
+        Serial2.write(XOFF);
+        Serial.println("Forwarding result to Home Assistant");
+        switch (result->messageType) {
+            case MessageType::DISCOVERY_PAYLOAD: {
+                Serial.printf("%s", result->discovery.dev.mdl);
+                Serial.printf("%s", result->discovery.origin.name);
+                Serial.printf("%d", result->discovery.cmpCount);
+                Serial.printf("%s", result->discovery.cmps[0].key);
+                Serial.printf("%s", result->discovery.cmps[0].value.name);
+                Serial.printf("%s", result->discovery.cmps[0].value.stat_t);
+                if (homeAssistant.discovery(result->discovery)) {
+                    Serial.println("Published discovery successfully");
+                } else {
+                    Serial.println("Failed to publish discovery");
+                }
+                break;
+            }
+            case MessageType::STATE_UPDATE_FLOAT: {
+                if (homeAssistant.publishStateUpdate(result->stateUpdateF)) {
+                    Serial.println("Published state update successfully");
+                } else {
+                    Serial.printf("Failed to publish state update of type %d\n",
+                                  (uint8_t)result->messageType);
+                }
+                break;
+            }
+            default: {
+                Serial.printf("Unhandle message type %d",
+                              (uint8_t)result->messageType);
+                break;
+            }
+        }
+
+        // Clean up data on heap
         delete result;
+
+        // Send XON signal to say we are ready to read more.
+        Serial2.write(XON);
     }
 }

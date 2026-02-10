@@ -2,17 +2,6 @@
 
 #include <ArduinoJson.h>
 
-#include "constants.h"
-
-/**
- * @brief Destructor for HADiscoveryPayload
- */
-HADiscoveryPayload::~HADiscoveryPayload() {
-    delete this->dev;
-    delete this->origin;
-    delete[] this->cmps;
-}
-
 /**
  * @brief Converts the object to a JSON document.
  * @return The JSON document (smart pointer)
@@ -21,18 +10,16 @@ JsonDocument HADiscoveryPayload::toJSON() {
     JsonDocument jsonPayload;
 
     JsonObject dev = jsonPayload["dev"].to<JsonObject>();
-    dev["ids"] = this->dev->ids;
-    dev["name"] = this->dev->name;
-    dev["mf"] = this->dev->mf;
-    dev["mdl"] = this->dev->mdl;
+    dev["ids"] = this->dev.ids;
+    dev["name"] = this->dev.name;
+    dev["mf"] = this->dev.mf;
+    dev["mdl"] = this->dev.mdl;
 
-    // If there is an origin, convert it to JSON
-    if (this->origin != nullptr) {
-        jsonPayload["o"] = this->origin->toJSON();
-    }
+    // TODO: Make this->origin optional in HADiscoveryPayload
+    jsonPayload["o"] = this->origin.toJSON();
 
     // If there are components, convert them to JSON
-    if (this->cmps != nullptr) {
+    if (this->cmpCount > 0) {
         JsonObject cmps = jsonPayload["cmps"].to<JsonObject>();
 
         for (size_t i = 0; i < this->cmpCount; i++) {
@@ -75,4 +62,38 @@ JsonDocument HAComponentOptions::toJSON() {
     jsonPayload["name"] = this->name;
 
     return jsonPayload;
+}
+
+HAMessage::HAMessage(MessageType msgType) : messageType(msgType) {
+    switch (this->messageType) {
+        case MessageType::STATE_UPDATE_FLOAT:
+            this->stateUpdateF = HAStateUpdate<float>{};
+            break;
+        case MessageType::STATE_UPDATE_INT:
+            this->stateUpdateI = HAStateUpdate<int>{};
+            break;
+        case MessageType::STATE_UPDATE_CHAR_128:
+            this->stateUpdateS = HAStateUpdate<char[128]>{};
+            break;
+        case MessageType::DISCOVERY_PAYLOAD:
+            this->discovery = HADiscoveryPayload{};
+            break;
+        default:
+            Serial.println("Unknown message type in HAMessage constructor");
+            break;
+    }
+}
+
+/**
+ * @brief Destructor for the HAMessage struct
+ */
+HAMessage::~HAMessage() {
+    switch (this->messageType) {
+        case MessageType::DISCOVERY_PAYLOAD: {
+            this->discovery.~HADiscoveryPayload();
+            break;
+        }
+        default:
+            break;
+    }
 }

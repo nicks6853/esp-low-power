@@ -17,7 +17,7 @@ uint8_t HAManager::discovery(HADiscoveryPayload discoveryPayload) {
 
     char topic[255];
     snprintf(topic, sizeof(topic), "%s/device/%s/config", HA_DISCOVERY_PREFIX,
-             discoveryPayload.dev->ids);
+             discoveryPayload.dev.ids);
 
     // Create buffer of the size required to send the message
     size_t requiredSize = measureJson(jsonPayload);
@@ -73,15 +73,8 @@ uint8_t HAManager::discovery(HADiscoveryPayload discoveryPayload) {
  * @param stateUpdate The state update message to publish.
  * @return a 1 indicating success, 0 indicating failure.
  */
-uint8_t HAManager::publishState(HAStateUpdate<float> stateUpdate) {
+uint8_t HAManager::publishStateUpdate(HAStateUpdate<float> stateUpdate) {
     char strValue[64];
-
-    if (stateUpdate.messageType != MessageType::STATE_UPDATE_FLOAT) {
-        Serial.println(
-            "publishState - function for float type called but state update is "
-            "not a float.");
-        return 0;
-    }
 
     snprintf(strValue, sizeof(strValue), "%.4f", stateUpdate.value);
     Serial.printf("Publishing state %s to topic %s\n", strValue,
@@ -91,15 +84,8 @@ uint8_t HAManager::publishState(HAStateUpdate<float> stateUpdate) {
     return 1;
 }
 
-uint8_t HAManager::publishState(HAStateUpdate<int32_t> stateUpdate) {
+uint8_t HAManager::publishStateUpdate(HAStateUpdate<int32_t> stateUpdate) {
     char strValue[64];
-
-    if (stateUpdate.messageType != MessageType::STATE_UPDATE_INT) {
-        Serial.println(
-            "publishState - function for int type called but state update is "
-            "not an int.");
-        return 0;
-    }
 
     snprintf(strValue, sizeof(strValue), "%ud", stateUpdate.value);
     Serial.printf("Publishing state %s to topic %s\n", strValue,
@@ -109,14 +95,7 @@ uint8_t HAManager::publishState(HAStateUpdate<int32_t> stateUpdate) {
     return 1;
 }
 
-uint8_t HAManager::publishState(HAStateUpdate<bool> stateUpdate) {
-    if (stateUpdate.messageType != MessageType::STATE_UPDATE_BOOL) {
-        Serial.println(
-            "publishState - function for bool type called but state update is "
-            "not an bool.");
-        return 0;
-    }
-
+uint8_t HAManager::publishStateUpdate(HAStateUpdate<bool> stateUpdate) {
     char strValue[4];
 
     if (stateUpdate.value) {

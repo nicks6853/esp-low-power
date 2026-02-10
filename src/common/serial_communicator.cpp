@@ -2,39 +2,9 @@
 
 #include <Arduino.h>
 
-#include "config.h"
 #include "constants.h"
 #include "message_type.h"
 #include "serializable.h"
-
-IncomingMessage::~IncomingMessage() {
-    switch (this->type) {
-        case (MessageType::STATE_UPDATE_FLOAT): {
-            delete floatData;
-            break;
-        }
-        case (MessageType::STATE_UPDATE_INT): {
-            delete intData;
-            break;
-        }
-        case (MessageType::STATE_UPDATE_CHAR_128): {
-            delete charData;
-            break;
-        }
-        case (MessageType::DISCOVERY_PAYLOAD): {
-            delete discoveryData;
-            break;
-        }
-        default: {
-            Serial.printf(
-                "Destructor not set for message type %d. This might cause a "
-                "memory "
-                "leak",
-                (uint8_t)this->type);
-            break;
-        }
-    }
-}
 
 void SerialCommunicator::write(const Serializable& body) {
     this->_serial.write(MESSAGE_START);
@@ -52,19 +22,16 @@ void SerialCommunicator::_flushSerial() {
 
 void SerialCommunicator::_reset() {
     /**
-     * NOTE: this->_readBuffer is not deleted
-     * because it is returned to the caller when this->read()
-     * is called.
-     * The caller is responsible for the memory on the heap.
+     * Intentionally reset the buffer
+     * without deleting the data on the heap
+     * because it is returned to the caller
      */
     this->_readBuffer = nullptr;
+
     this->_readIndex = 0;
     this->_readSize = 0;
-    this->_currentState = SerialCommunicatorState::IDLE;
-    delay(1000);
 
-    // Send XON signal
-    this->_serial.write(XON);
+    this->_currentState = SerialCommunicatorState::IDLE;
 }
 
 void SerialCommunicator::_handleIdle() {
@@ -74,9 +41,6 @@ void SerialCommunicator::_handleIdle() {
 
         this->_currentState = SerialCommunicatorState::WAIT_FOR_TYPE;
         this->_readIndex = 0;
-
-        // Send XOFF signal
-        this->_serial.write(XOFF);
     }
 }
 
@@ -87,32 +51,19 @@ void SerialCommunicator::_handleIdle() {
  */
 void SerialCommunicator::_handleWaitForType() {
     uint8_t incomingByte = this->_serial.read();
+    Serial.println(incomingByte);
     this->_readMessageType = (MessageType)incomingByte;
     Serial.printf("Message type: %d\n", (uint8_t)this->_readMessageType);
-    switch (this->_readMessageType) {
-        case MessageType::STATE_UPDATE_FLOAT: {
-            this->_readSize = sizeof(HAStateUpdate<float>);
-            this->_readBuffer = new uint8_t[sizeof(HAStateUpdate<float>)];
-            this->_currentState = SerialCommunicatorState::READING;
-            break;
-        }
-        default: {
-            Serial.println("Not handled");
-            this->_currentState = SerialCommunicatorState::IDLE;
-            break;
-        }
-    }
+    this->_readSize = sizeof(HAMessage);
+    this->_readBuffer = new uint8_t[sizeof(HAMessage)];
+    this->_currentState = SerialCommunicatorState::READING;
 }
 
 /**
- * @brief Handles reading the struct bytes from the Serial connection.
- * @return A pointer to the complete struct or nullptr if we are not done
- *         reading or there is nothing to read.
+ * @brief Handles reading HAMesages from the Serial connection.
+ * @return A 1 or 0 indicating success or failure.
  */
-IncomingMessage* SerialCommunicator::_handleReading() {
-    // Prepare response pointer, stays null if we didn't finish reading.
-    IncomingMessage* returnMsg = nullptr;
-
+HAMessage* SerialCommunicator::_handleReading() {
     // Save to our buffer
     size_t amountRead =
         this->_serial.readBytes(this->_readBuffer + this->_readIndex,
@@ -125,50 +76,35 @@ IncomingMessage* SerialCommunicator::_handleReading() {
         if (this->_serial.read() == MESSAGE_END) {
             /**
              * Here, we've read all the bytes, handle the different
-             * types and return the result as an IncomingMessage struct.
+             * types and return the result as an HAMessage struct.
              */
 
             Serial.println("Read complete object");
+            HAMessage* returnPtr = (HAMessage*)this->_readBuffer;
 
-            switch (this->_readMessageType) {
-                case MessageType::STATE_UPDATE_FLOAT: {
-                    returnMsg = new IncomingMessage;
-                    returnMsg->type = this->_readMessageType;
-                    returnMsg->floatData =
-                        (HAStateUpdate<float>*)this->_readBuffer;
+            this->_reset();
 
-                    break;
-                }
-                default: {
-                    Serial.println("Unsupported type");
-                    break;
-                }
-            }
-
+            return returnPtr;
         } else {
             Serial.println("End marker missing (shifted data)");
             delete[] this->_readBuffer;
-            this->_readBuffer = nullptr;
+            this->_reset();
         }
-        this->_reset();
     } else {
         Serial.println("Timeout reached before struct was full.");
-        delete[] this->_readBuffer;
-        this->_readBuffer = nullptr;
         this->_flushSerial();
+        delete[] this->_readBuffer;
         this->_reset();
         Serial.println("Waiting for next start marker...");
     }
-
-    return returnMsg;
+    return nullptr;
 }
 
 /**
- * @brief Reads incoming structs on the Serial connection.
- * @return A pointer to the incoming message or nullptr if nothing
- *         has been received.
+ * @brief Reads incoming HAMessage structs on the Serial connection.
+ * @return Returns a pointer to the item read, or nullptr if nothing was read
  */
-IncomingMessage* SerialCommunicator::read() {
+HAMessage* SerialCommunicator::read() {
     if (this->_serial.available() > 0) {
         switch (this->_currentState) {
             case SerialCommunicatorState::IDLE: {
