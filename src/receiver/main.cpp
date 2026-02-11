@@ -14,11 +14,6 @@
 #include "config.h"
 #include "message_type.h"
 
-struct EspNowState {
-    uint8_t channel;
-};
-
-EspNowState espnowState;
 HAMessage* currentMessage;
 QueueHandle_t msgQueue;
 
