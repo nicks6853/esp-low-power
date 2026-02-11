@@ -143,7 +143,7 @@ void loop() {
 
     currentTime = millis();
 
-    if (currentTime - lastReading >= 5000) {
+    if (currentTime - lastReading >= 60000) {
         if (canSend) {
             Serial.println("Not busy, writing");
             writeToSerial();

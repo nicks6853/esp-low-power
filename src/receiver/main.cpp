@@ -1,133 +1,207 @@
 /**
  * Notes:
- * The receiver should:
- * - Wait for messages to come in on ESPNOW
- * - Add those messages to a queue xQueueSendToBack(queueName, incomingData, 0)
- * - Have the main loop process things from the queue, 1 by 1 (with
- * xQueueReceiver(sensorQueue, &pendingData, portMAX_DELAY)
- * - Main loop needs to wait for the "clear to send" line to be LOW from the
- * router.
+ * Clean up code in the queue processing function
+ * Add a checksum on the chunks from the edge device, and verify the complete
+ * payload once it's been received. As messages are complete on the queue,
+ * forward them to the Serial connection.
  *
- *
- * Look up Serial.setPins() and Serial.setHwFlowCtrlMode(UART_HW_FLOWCTRL_CTS)
- * and  Serial.setHwFlowCtrlMode(UART_HW_FLOWCTRL_RTS) for a method to automate
- * the RTS / CTS flow control. ONLY AVAILABLE FOR ESP32, and would be REQUIRED
- * ON BOTH RECEIVER AND ROUTER, so maybe not viable, but you can implement the
- * concept manually pretty easily.
  */
 #include <Arduino.h>
-#include <config.h>
-#include <constants.h>
-#include <message_type.h>
+#include <WiFi.h>
+#include <esp_now.h>
 
-#include "HardwareSerial.h"
+#include "chunk.h"
 #include "config.h"
+#include "message_type.h"
 
-enum SerialState { WAIT = 0, WAIT_FOR_TYPE = 1, READING = 2 };
+struct EspNowState {
+    uint8_t channel;
+};
 
-SerialState state = SerialState::WAIT;
-size_t readIndex = 0;  // Max indexes a 256 array
-MessageType messageType;
-uint8_t* readBuffer = nullptr;
-size_t messageSize;
+EspNowState espnowState;
+HAMessage* currentMessage;
+QueueHandle_t msgQueue;
 
-void resetReaderState() {
-    // Reset the buffer
-    delete[] readBuffer;
-    readBuffer = nullptr;
-    readIndex = 0;
-    state = SerialState::WAIT;
-}
+unsigned long lastAction = 0;
+unsigned long currentTime;
 
-size_t getSizefromMessageType(MessageType type) {
-    switch (type) {
-        case MessageType::DEVICE:
-            return sizeof(HADevice);
-        case MessageType::COMPONENT_OPTIONS:
-            return sizeof(HAComponentOptions);
-        case MessageType::DISCOVERY_PAYLOAD:
-            return sizeof(HADiscoveryPayload);
-        case MessageType::ORIGIN:
-            return sizeof(HAOrigin);
-        default:
-            return 0;
+struct esp_now_message_t {
+    uint8_t mac_addr[6];
+    uint8_t payload[250];  // ESP-NOW max is 250 bytes
+    size_t length;
+};
+
+struct ActiveBuffer {
+    uint64_t chipId;
+    uint8_t* buffer = nullptr;
+    size_t chunksRead = 0;
+    unsigned long readStart = 0;
+};
+
+/**
+ * Receives message chunks from ESPNOW and pushes it to a queue to be processed.
+ * @param mac The mac address of the sender
+ * @param incomingData The bytes of data received from the sender
+ * @param len The length of the incoming data.
+ */
+void receiveCallback(const uint8_t* mac, const uint8_t* incomingData, int len) {
+    Serial.println("Received a message!");
+
+    esp_now_message_t msg;
+    memcpy(msg.mac_addr, mac, 6);
+    memcpy(msg.payload, incomingData, len);
+    msg.length = len;
+
+    if (xQueueSend(msgQueue, &msg, 0) != pdTRUE) {
+        Serial.println("Queue is full! Unable to process message");
     }
 }
 
+/**
+ * Background process to read chunks coming from ESPNOW
+ * that are on the queue and build messages out of them.
+ * @param pvParameters Parameters from the PV
+ */
+void processTask(void* pvParameters) {
+    esp_now_message_t receivedMsg;
+
+    // Initialize all the potential active buffers to 0 / nullptr
+    ActiveBuffer activeBuffers[10];
+    for (size_t i = 0; i < sizeof(activeBuffers) / sizeof(ActiveBuffer); i++) {
+        activeBuffers[i].buffer = nullptr;
+        activeBuffers[i].chipId = 0;
+    }
+
+    while (true) {
+        // wait indefinitely for a message (portMAX_DELAY)
+        if (xQueueReceive(msgQueue, &receivedMsg, portMAX_DELAY) == pdTRUE) {
+            Serial.println("Processing queue message");
+            EspNowChunk currentChunk;
+            memcpy(&currentChunk, receivedMsg.payload, receivedMsg.length);
+
+            // Find the active buffer for this chunk based on chipId
+            ActiveBuffer* activeBuffer = nullptr;
+            ActiveBuffer* firstAvailableBuffer = nullptr;
+            for (size_t i = 0;
+                 i < sizeof(activeBuffers) / sizeof(ActiveBuffer) &&
+                 activeBuffer == nullptr;
+                 i++) {
+                if (activeBuffers[i].chipId == currentChunk.chipId) {
+                    // Save a pointer to the active buffer
+                    activeBuffer = &activeBuffers[i];
+                }
+
+                if (firstAvailableBuffer == nullptr &&
+                    activeBuffers[i].chipId == 0) {
+                    firstAvailableBuffer = &activeBuffers[i];
+                }
+            }
+
+            // If we did not find an available buffer, use
+            // the first buffer in the activeBuffers array that
+            // was not currently in use.
+            if (activeBuffer == nullptr) {
+                activeBuffer = firstAvailableBuffer;
+            }
+
+            if (activeBuffer->buffer == nullptr) {
+                if (currentChunk.chunkIndex != 0) {
+                    Serial.println(
+                        "Received non-first chunk without active buffer, "
+                        "ignoring");
+                    continue;
+                }
+                Serial.println("Reading a new payload");
+                // We are processing a new chunk
+                activeBuffer->chipId =
+                    currentChunk.chipId;  // Mark the buffer with the chip ID
+                activeBuffer->buffer = new uint8_t[currentChunk.totalLen];
+                activeBuffer->readStart = millis();
+                activeBuffer->chunksRead = 0;
+            }
+
+            if (activeBuffer->chunksRead > currentChunk.totalChunks) {
+                Serial.println("Received too many bytes! Clearing the buffer");
+                activeBuffer->chunksRead = 0;
+                delete[] activeBuffer->buffer;
+                activeBuffer->buffer = nullptr;
+                activeBuffer->chipId = 0;
+                activeBuffer->readStart = 0;
+                continue;
+            }
+
+            if (millis() - activeBuffer->readStart > 200) {
+                Serial.println(
+                    "Payload took longer than 500ms to come in, aborting.");
+                activeBuffer->chunksRead = 0;
+                delete[] activeBuffer->buffer;
+                activeBuffer->buffer = nullptr;
+                activeBuffer->chipId = 0;
+                activeBuffer->readStart = 0;
+                continue;
+            }
+
+            memcpy(activeBuffer->buffer + currentChunk.chunkIndex,
+                   &currentChunk.data, currentChunk.len);
+            activeBuffer->chunksRead += 1;
+
+            if (activeBuffer->chunksRead == currentChunk.totalChunks) {
+                Serial.println("Finished reading payload");
+                HAMessage* msg = (HAMessage*)activeBuffer->buffer;
+                Serial.println("===================");
+                Serial.printf("Message type: %d, topic: %s, value: %.2f\n",
+                              (uint8_t)msg->messageType,
+                              msg->stateUpdateF.topic, msg->stateUpdateF.value);
+                Serial.println("===================");
+                activeBuffer->chunksRead = 0;
+                delete[] activeBuffer->buffer;
+                activeBuffer->buffer = nullptr;
+                activeBuffer->chipId = 0;
+                activeBuffer->readStart = 0;
+            }
+        }
+    }
+}
+
+uint8_t initializeEspNow() {
+    Serial.println("Initializing ESPNOW...");
+
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect();
+
+    // Print mac address
+    Serial.print("Mac address: ");
+    Serial.println(WiFi.macAddress());
+
+    if (esp_now_init() != 0) {
+        Serial.println("Error initializing ESPNOW!");
+        return 0;
+    }
+
+    Serial.println("ESPNOW Initialized!");
+
+    return 1;
+}
+
 void setup() {
-    Serial2.begin(ESP_BAUD_RATE, SERIAL_8N1, RX2, TX2);
-    Serial2.setTimeout(100);  // Set timeout to 100ms to prevent hanging too
-                              // long if readBytes gets stuck
     Serial.begin(ESP_BAUD_RATE);
 
-    HAStateUpdate<float> data;
-    data.value = 2.0;
+    while (!Serial);
 
-    while (!Serial || !Serial2);
-    Serial.println("Serial ready!");
-    delay(500);
+    Serial.println("Serial is ready!");
+
+    msgQueue = xQueueCreate(20, sizeof(esp_now_message_t));
+    xTaskCreate(processTask, "ProcessTask", 4096, NULL, 1, NULL);
+
+    initializeEspNow();
+    uint8_t res = esp_now_register_recv_cb(receiveCallback);
+    Serial.printf("RESULT FROM REGISTERING CALLBACK: %d", res);
 }
 
 void loop() {
-    if (Serial2.available() > 0) {
-        switch (state) {
-            case SerialState::WAIT: {
-                uint8_t incomingByte = Serial2.read();
-                if (incomingByte == MESSAGE_START) {
-                    Serial.println("Started reading");
-
-                    state = SerialState::WAIT_FOR_TYPE;
-                    readIndex = 0;
-                }
-                break;
-            }
-            case SerialState::WAIT_FOR_TYPE: {
-                uint8_t incomingByte = Serial2.read();
-                messageType = (MessageType)incomingByte;
-                Serial.printf("Message type: %d\n", (uint8_t)messageType);
-                switch (messageType) {
-                    case MessageType::DEVICE: {
-                        messageSize = sizeof(HADevice);
-                        readBuffer = new uint8_t[sizeof(HADevice)];
-                        state = SerialState::READING;
-                        break;
-                    }
-                    default: {
-                        Serial.println("Not handled");
-                        state = SerialState::WAIT;
-                        break;
-                    }
-                }
-                break;
-            }
-            case SerialState::READING: {
-                // Save to our buffer
-                size_t amountRead = Serial2.readBytes(readBuffer, messageSize);
-
-                if (amountRead == messageSize) {
-                    if (Serial2.read() == MESSAGE_END) {
-                        Serial.printf(
-                            "Finished reading! Total bytes: %d, Should be: "
-                            "%d\n",
-                            readIndex, sizeof(HADevice));
-
-                        HADevice* device = (HADevice*)readBuffer;
-                        Serial.printf(
-                            "name: %s\nids: %s\nmdl: %s\nmf: %s\ntype: %d\n",
-                            device->name, device->ids, device->mdl, device->mf,
-                            (uint8_t)device->type);
-                    } else {
-                        Serial.println("End marker missing (shifted data)");
-                        break;
-                    }
-                } else {
-                    Serial.println("Timeout reached before struct was full.");
-                    flushSerial();
-                    Serial.println("Waiting for next start marker...");
-                }
-
-                resetReaderState();
-            }
-        }
+    currentTime = millis();
+    if (currentTime - lastAction > 2000) {
+        Serial.println(ESP.getFreeHeap());
+        lastAction = currentTime;
     }
 }
