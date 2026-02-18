@@ -11,7 +11,8 @@ ComponentsBuilder::~ComponentsBuilder() { delete[] this->_components; }
 ComponentBuilder ComponentsBuilder::addComponent(const char* componentId) {
     if (this->_componentsIndex < HA_MAX_COMPONENT_PER_DEVICE) {
         HAComponent& component = this->_components[this->_componentsIndex++];
-        component.key = componentId;
+        strncpy(component.key, componentId, sizeof(component.key));
+        component.key[sizeof(component.key) - 1] = '\0';
 
         return ComponentBuilder(*this, component.value);
     }
@@ -20,7 +21,6 @@ ComponentBuilder ComponentsBuilder::addComponent(const char* componentId) {
         "addComponent - Overflow!! Too many components. Maximum is %d\n",
         HA_MAX_COMPONENT_PER_DEVICE);
     HAComponent& component = this->_components[HA_MAX_COMPONENT_PER_DEVICE - 1];
-    component.key = componentId;
     return ComponentBuilder(*this, component.value);
 }
 

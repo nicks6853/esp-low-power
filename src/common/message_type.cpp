@@ -3,32 +3,40 @@
 #include <ArduinoJson.h>
 
 /**
+ * Forward declarations
+ */
+JsonDocument toJSON(HAOrigin item);
+JsonDocument toJSON(HADiscoveryPayload item);
+JsonDocument toJSON(HAComponentOptions item);
+
+/**
  * @brief Converts the object to a JSON document.
+ * @param item The HADiscoveryPayload to convert to JSON
  * @return The JSON document (smart pointer)
  */
-JsonDocument HADiscoveryPayload::toJSON() {
+JsonDocument toJSON(HADiscoveryPayload item) {
     JsonDocument jsonPayload;
 
     JsonObject dev = jsonPayload["dev"].to<JsonObject>();
-    dev["ids"] = this->dev.ids;
-    dev["name"] = this->dev.name;
-    dev["mf"] = this->dev.mf;
-    dev["mdl"] = this->dev.mdl;
+    dev["ids"] = item.dev.ids;
+    dev["name"] = item.dev.name;
+    dev["mf"] = item.dev.mf;
+    dev["mdl"] = item.dev.mdl;
 
-    // TODO: Make this->origin optional in HADiscoveryPayload
-    jsonPayload["o"] = this->origin.toJSON();
+    // TODO: Make item.origin optional in HADiscoveryPayload
+    jsonPayload["o"] = toJSON(item.origin);
 
     // If there are components, convert them to JSON
-    if (this->cmpCount > 0) {
+    if (item.cmpCount > 0) {
         JsonObject cmps = jsonPayload["cmps"].to<JsonObject>();
 
-        for (size_t i = 0; i < this->cmpCount; i++) {
-            HAComponent component = this->cmps[i];
+        for (size_t i = 0; i < item.cmpCount; i++) {
+            HAComponent component = item.cmps[i];
 
             const char* key = component.key;
             HAComponentOptions value = component.value;
 
-            cmps[key] = value.toJSON();
+            cmps[key] = toJSON(value);
         }
     }
 
@@ -37,29 +45,31 @@ JsonDocument HADiscoveryPayload::toJSON() {
 
 /**
  * @brief Converts the object to a JSON document.
+ * @param item The HAOrigin to convert to JSON
  * @return The JSON document (smart pointer)
  */
-JsonDocument HAOrigin::toJSON() {
+JsonDocument toJSON(HAOrigin item) {
     JsonDocument jsonPayload;
-    jsonPayload["name"] = this->name;
-    jsonPayload["sw"] = this->sw;
-    jsonPayload["url"] = this->url;
+    jsonPayload["name"] = item.name;
+    jsonPayload["sw"] = item.sw;
+    jsonPayload["url"] = item.url;
 
     return jsonPayload;
 }
 
 /**
  * @brief Converts the object to a JSON document.
+ * @param item The HAComponentOptions to convert to JSON
  * @return The JSON document (smart pointer)
  */
-JsonDocument HAComponentOptions::toJSON() {
+JsonDocument toJSON(HAComponentOptions item) {
     JsonDocument jsonPayload;
-    jsonPayload["p"] = this->p;
-    jsonPayload["dev_cla"] = this->dev_cla;
-    jsonPayload["uniq_id"] = this->uniq_id;
-    jsonPayload["stat_t"] = this->stat_t;
-    jsonPayload["unit_of_meas"] = this->unit_of_meas;
-    jsonPayload["name"] = this->name;
+    jsonPayload["p"] = item.p;
+    jsonPayload["dev_cla"] = item.dev_cla;
+    jsonPayload["uniq_id"] = item.uniq_id;
+    jsonPayload["stat_t"] = item.stat_t;
+    jsonPayload["unit_of_meas"] = item.unit_of_meas;
+    jsonPayload["name"] = item.name;
 
     return jsonPayload;
 }

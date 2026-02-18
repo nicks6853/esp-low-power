@@ -3,14 +3,13 @@
 #include <espnow.h>
 
 #include "BME280I2C.h"
-#include "chunk.h"
+#include "chunker.h"
 #include "components_builder.h"
 #include "config.h"
 #include "device_builder.h"
 #include "message_type.h"
 #include "origin_builder.h"
 
-HADiscoveryPayload discoveryPayload;
 BME280I2C bme;
 unsigned long lastReading = 0;
 
@@ -90,22 +89,22 @@ void createDevice() {
                                   .completeComponent()
                                   .build();
 
-    HAStateUpdate<float> stateUpdate;
-    strncpy(stateUpdate.topic, "multisensor/temp/state",
-            sizeof(stateUpdate.topic));
-    stateUpdate.topic[sizeof(stateUpdate.topic) - 1] = '\0';
-    stateUpdate.value = 12.0;
+    HADiscoveryPayload discoveryPayload;
 
-    HAMessage msg(MessageType::STATE_UPDATE_FLOAT);
-    memcpy(&msg.stateUpdateF, &stateUpdate, sizeof(stateUpdate));
+    discoveryPayload.cmpCount = 2;
+    memcpy(&discoveryPayload.dev, device, sizeof(HADevice));
+    memcpy(&discoveryPayload.origin, origin, sizeof(HAOrigin));
+    memcpy(&discoveryPayload.cmps, components, sizeof(HAComponent) * 2);
+
+    HAMessage* msg = new HAMessage(MessageType::DISCOVERY_PAYLOAD);
+    msg->discovery = discoveryPayload;
+
+    EspNowChunker chunker;
+    chunker.send(destinationMac, (uint8_t*)msg, sizeof(*msg));
 
     delete device;
     delete origin;
     delete[] components;
-
-    // Send over ESPNOW
-    EspNowChunker chunker;
-    chunker.send(destinationMac, (uint8_t*)&msg, sizeof(msg));
 }
 
 void sendCallback(uint8_t* mac, uint8_t sendStatus) {
@@ -127,6 +126,17 @@ uint8_t initializeEspNow() {
         return 0;
     }
 
+    // Set the current role
+    uint8_t res = esp_now_set_self_role(ESP_NOW_ROLE_CONTROLLER);
+    Serial.printf("RESULT FROM SET ROLE: %d", res);
+    // Register peer
+    res = esp_now_add_peer(destinationMac, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
+    Serial.printf("RESULT FROM ADD PEER: %d", res);
+
+    // Register callback on send
+    res = esp_now_register_send_cb(sendCallback);
+    Serial.printf("Result from register send callback: %d", res);
+
     Serial.println("ESPNOW Initialized!");
     return 1;
 }
@@ -138,16 +148,8 @@ void setup() {
 
     initializeEspNow();
 
-    // Set the current role
-    uint8_t res = esp_now_set_self_role(ESP_NOW_ROLE_CONTROLLER);
-    Serial.printf("RESULT FROM SET ROLE: %d", res);
-    // Register peer
-    res = esp_now_add_peer(destinationMac, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
-    Serial.printf("RESULT FROM ADD PEER: %d", res);
-
-    // Register callback on send
-    res = esp_now_register_send_cb(sendCallback);
-    Serial.printf("Result from register send callback: %d", res);
+    // Send the discovery message for Home Assistant
+    createDevice();
 }
 
 void loop() {
@@ -157,7 +159,6 @@ void loop() {
 
     if (currentTime - lastReading >= 2000) {
         // Send a message over ESPNOW
-        createDevice();
 
         // float temperature = bme.temp();
         // float humidity = bme.hum();

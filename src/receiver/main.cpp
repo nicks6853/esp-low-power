@@ -1,36 +1,38 @@
-/**
- * Notes:
- * Clean up code in the queue processing function
- * Add a checksum on the chunks from the edge device, and verify the complete
- * payload once it's been received. As messages are complete on the queue,
- * forward them to the Serial connection.
- *
- */
 #include <Arduino.h>
 #include <WiFi.h>
 #include <esp_now.h>
 
-#include "chunk.h"
+#include "chunker.h"
 #include "config.h"
 #include "message_type.h"
 
 HAMessage* currentMessage;
-QueueHandle_t msgQueue;
+QueueHandle_t espnowQueue;
 
 unsigned long lastAction = 0;
 unsigned long currentTime;
 
+/**
+ * Represents a messages received on ESPNOW
+ * that is queued to be processed.
+ */
 struct esp_now_message_t {
     uint8_t mac_addr[6];
     uint8_t payload[250];  // ESP-NOW max is 250 bytes
     size_t length;
 };
 
+/**
+ * Struct representing one of the active buffers that is
+ * recording chunks from messages coming from edge devices.
+ */
 struct ActiveBuffer {
     uint64_t chipId;
     uint8_t* buffer = nullptr;
     size_t chunksRead = 0;
+    size_t bytesRead = 0;
     unsigned long readStart = 0;
+    uint8_t checksum = 0;
 };
 
 /**
@@ -47,7 +49,7 @@ void receiveCallback(const uint8_t* mac, const uint8_t* incomingData, int len) {
     memcpy(msg.payload, incomingData, len);
     msg.length = len;
 
-    if (xQueueSend(msgQueue, &msg, 0) != pdTRUE) {
+    if (xQueueSend(espnowQueue, &msg, 0) != pdTRUE) {
         Serial.println("Queue is full! Unable to process message");
     }
 }
@@ -57,7 +59,7 @@ void receiveCallback(const uint8_t* mac, const uint8_t* incomingData, int len) {
  * that are on the queue and build messages out of them.
  * @param pvParameters Parameters from the PV
  */
-void processTask(void* pvParameters) {
+void processTask(void* _pvParameters __attribute__((unused))) {
     esp_now_message_t receivedMsg;
 
     // Initialize all the potential active buffers to 0 / nullptr
@@ -69,7 +71,7 @@ void processTask(void* pvParameters) {
 
     while (true) {
         // wait indefinitely for a message (portMAX_DELAY)
-        if (xQueueReceive(msgQueue, &receivedMsg, portMAX_DELAY) == pdTRUE) {
+        if (xQueueReceive(espnowQueue, &receivedMsg, portMAX_DELAY) == pdTRUE) {
             Serial.println("Processing queue message");
             EspNowChunk currentChunk;
             memcpy(&currentChunk, receivedMsg.payload, receivedMsg.length);
@@ -139,20 +141,39 @@ void processTask(void* pvParameters) {
             memcpy(activeBuffer->buffer + currentChunk.chunkIndex,
                    &currentChunk.data, currentChunk.len);
             activeBuffer->chunksRead += 1;
+            activeBuffer->bytesRead += currentChunk.len;
 
             if (activeBuffer->chunksRead == currentChunk.totalChunks) {
                 Serial.println("Finished reading payload");
-                HAMessage* msg = (HAMessage*)activeBuffer->buffer;
-                Serial.println("===================");
-                Serial.printf("Message type: %d, topic: %s, value: %.2f\n",
-                              (uint8_t)msg->messageType,
-                              msg->stateUpdateF.topic, msg->stateUpdateF.value);
-                Serial.println("===================");
-                activeBuffer->chunksRead = 0;
+                Serial.println("Validating checksum...");
+                // Verify checksum
+                uint8_t checksum = currentChunk.checksum;
+                for (size_t i = 0; i < activeBuffer->bytesRead; i++) {
+                    checksum ^= activeBuffer->buffer[i];
+                }
+
+                // XOR checksum should be zero if all bytes were received
+                if (checksum == 0) {
+                    Serial.println("Checksum validation succeeded!");
+                    HAMessage* msg = (HAMessage*)activeBuffer->buffer;
+                    Serial.println("===================");
+                    Serial.printf("Message type: %d\n",
+                                  (uint8_t)msg->messageType);
+                    Serial.printf("cmpCount: %d", msg->discovery.cmpCount);
+                    Serial.printf("dev: %s", msg->discovery.dev.name);
+                    Serial.println("===================");
+                } else {
+                    Serial.println("Checksum validation failed! Aborting!");
+                }
+
+                // Reset the active buffer.
                 delete[] activeBuffer->buffer;
+                activeBuffer->chunksRead = 0;
                 activeBuffer->buffer = nullptr;
                 activeBuffer->chipId = 0;
                 activeBuffer->readStart = 0;
+                activeBuffer->bytesRead = 0;
+                activeBuffer->checksum = 0;
             }
         }
     }
@@ -173,6 +194,9 @@ uint8_t initializeEspNow() {
         return 0;
     }
 
+    uint8_t res = esp_now_register_recv_cb(receiveCallback);
+    Serial.printf("RESULT FROM REGISTERING CALLBACK: %d", res);
+
     Serial.println("ESPNOW Initialized!");
 
     return 1;
@@ -185,18 +209,17 @@ void setup() {
 
     Serial.println("Serial is ready!");
 
-    msgQueue = xQueueCreate(20, sizeof(esp_now_message_t));
+    // Initialize msg queue and process to piece together chunked messages
+    espnowQueue = xQueueCreate(20, sizeof(esp_now_message_t));
     xTaskCreate(processTask, "ProcessTask", 4096, NULL, 1, NULL);
 
+    // Start ESPNOW protocol
     initializeEspNow();
-    uint8_t res = esp_now_register_recv_cb(receiveCallback);
-    Serial.printf("RESULT FROM REGISTERING CALLBACK: %d", res);
 }
 
 void loop() {
     currentTime = millis();
     if (currentTime - lastAction > 2000) {
-        Serial.println(ESP.getFreeHeap());
         lastAction = currentTime;
     }
 }

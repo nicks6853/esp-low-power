@@ -38,8 +38,6 @@ struct HAComponentOptions {
     char stat_t[32];        // state_topic
     char unit_of_meas[32];  // unit_of_measurement
     char name[32];          // name
-
-    JsonDocument toJSON();
 };
 
 /**
@@ -49,8 +47,6 @@ struct HAOrigin {
     char name[256];  // name
     char sw[32];     // sw_version
     char url[256];   // support_url
-
-    JsonDocument toJSON();
 };
 
 /**
@@ -58,7 +54,7 @@ struct HAOrigin {
  * Home Assistant's autodiscovery message
  */
 struct HAComponent {
-    const char* key;
+    char key[32];
     HAComponentOptions value;
 };
 
@@ -71,8 +67,6 @@ struct HADiscoveryPayload {
     HAOrigin origin;
     HAComponent cmps[HA_MAX_COMPONENT_PER_DEVICE];  // Array of the components
     size_t cmpCount;  // count of cmps in the array
-
-    JsonDocument toJSON();
 };
 
 /**
