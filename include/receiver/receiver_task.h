@@ -9,6 +9,20 @@
 #define PAYLOAD_TIMEOUT 200
 #define MAX_CALLBACK_FUNCTIONS 1
 
+// Forward declaration for structs
+class ReceiverTask;
+struct ActiveBuffer;
+
+/**
+ * Struct for data that is given to the timers
+ * that clear active buffers after they've been
+ * inactive for too long
+ */
+struct RequestTimeoutData {
+    ReceiverTask* instance;
+    TimerHandle_t timer;
+};
+
 /**
  * Struct representing one of the active buffers that is
  * recording chunks from messages coming from edge devices.
@@ -18,7 +32,7 @@ struct ActiveBuffer {
     uint8_t* buffer = nullptr;
     size_t chunksRead = 0;
     size_t bytesRead = 0;
-    unsigned long readStart = 0;
+    RequestTimeoutData* timeoutData;
 };
 
 /**
@@ -48,10 +62,11 @@ class ReceiverTask {
     HAMessage* _handleChunk(EspNowChunk& chunk);
     ActiveBuffer* _findActiveBuffer(uint64_t chipId);
     void _resetActiveBuffer(ActiveBuffer* buffer, bool free = true);
+    static void _requestTimeoutCallback(TimerHandle_t xTimer);
+    static void _taskBody(void* pvParameters);
 
    public:
     ReceiverTask(const char* name, uint16_t stackSize, UBaseType_t priority);
-    static void taskBody(void* pvParameters);
     void pushMsg(esp_now_message_t msg);
     void registerCompleteCallback(onCompleteCallback func);
 };

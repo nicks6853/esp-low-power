@@ -90,6 +90,6 @@ struct HAMessage {
         HAStateUpdate<int> stateUpdateI;
         HAStateUpdate<char[128]> stateUpdateS;
         HADiscoveryPayload discovery;
-    };
+    } payload;
 };
 #endif

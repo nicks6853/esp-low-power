@@ -34,10 +34,6 @@ void SenderTask::taskBody(void* pvParameters) {
             LOG(Serial.println("SENDER - Processing queue message"));
             LOG(Serial.printf("Message RECEIVED TYPE: %d\n",
                               (uint8_t)receivedMsg->messageType));
-
-            // Cleanup
-            delete receivedMsg;
-            receivedMsg = nullptr;
         }
     }
 }

@@ -9,7 +9,7 @@ ReceiverTask::ReceiverTask(const char* name, uint16_t stackSize,
         LOG(Serial.println("Failed to created _procQueue"));
     }
 
-    BaseType_t result = xTaskCreate(this->taskBody, name, stackSize,
+    BaseType_t result = xTaskCreate(this->_taskBody, name, stackSize,
                                     (void*)this, priority, &this->_task);
 
     if (result != pdPASS) {
@@ -22,7 +22,7 @@ ReceiverTask::ReceiverTask(const char* name, uint16_t stackSize,
  * Main body of the task
  * @param pvParameters The parameters given to the task
  */
-void ReceiverTask::taskBody(void* pvParameters) {
+void ReceiverTask::_taskBody(void* pvParameters) {
     ReceiverTask* instance = (ReceiverTask*)pvParameters;
     esp_now_message_t receivedMsg;
 
@@ -49,6 +49,23 @@ void ReceiverTask::taskBody(void* pvParameters) {
 }
 
 /**
+ * Callback that runs when a timer expires for a request.
+ * Takes clear of freeing up the buffer that was used to
+ * allow for another request to take its place.
+ */
+void ReceiverTask::_requestTimeoutCallback(TimerHandle_t xTimer) {
+    // Get the pointer to the active buffer and the receiver task instance
+    ActiveBuffer* activeBuffer = (ActiveBuffer*)pvTimerGetTimerID(xTimer);
+    ReceiverTask* instance = activeBuffer->timeoutData->instance;
+
+    LOG(
+        Serial.printf("Payload took longer than %dms to come in, clearing "
+                      "buffer for chip: 0x%016llX\n",
+                      PAYLOAD_TIMEOUT, activeBuffer->chipId));
+    instance->_resetActiveBuffer(activeBuffer);
+}
+
+/**
  * Given a chunk, handle adding it to the correct buffer.
  * @param chunk The chunk to handle.
  * @return A pointer to the complete HAMessage, or a nullptr if
@@ -62,17 +79,29 @@ HAMessage* ReceiverTask::_handleChunk(EspNowChunk& chunk) {
         LOG(Serial.println("New message received, initializing buffer."));
         activeBuffer->buffer = new uint8_t[chunk.totalLen];
         activeBuffer->chipId = chunk.chipId;
-        activeBuffer->readStart = millis();
         activeBuffer->chunksRead = 0;
+
+        // Start the timer to clear buffer if no data is received for x ms
+        activeBuffer->timeoutData = new RequestTimeoutData;
+        activeBuffer->timeoutData->instance = this;
+
+        /**
+         * Setup timer to clear buffer if chunks take too long
+         * to arrive.
+         */
+        activeBuffer->timeoutData->timer = xTimerCreate(
+            "RequestTimeout", pdMS_TO_TICKS(PAYLOAD_TIMEOUT), pdFALSE,
+            (void*)activeBuffer, this->_requestTimeoutCallback);
+
+        if (xTimerStart(activeBuffer->timeoutData->timer, 0) != pdPASS) {
+            LOG(
+                Serial.println("Failed to start request timeout timer. Timer "
+                               "queue might be full"));
+        }
     }
 
     if (activeBuffer->chunksRead > chunk.totalChunks) {
         LOG(Serial.println("Received too many chunks. Clearing the buffer."));
-        this->_resetActiveBuffer(activeBuffer);
-        return nullptr;
-    } else if (millis() - activeBuffer->readStart > PAYLOAD_TIMEOUT) {
-        LOG(Serial.printf("Payload took longer than %dms to come in, aborting.",
-                          PAYLOAD_TIMEOUT));
         this->_resetActiveBuffer(activeBuffer);
         return nullptr;
     }
@@ -146,8 +175,21 @@ void ReceiverTask::_resetActiveBuffer(ActiveBuffer* buffer, bool free) {
     buffer->buffer = nullptr;
     buffer->chunksRead = 0;
     buffer->chipId = 0;
-    buffer->readStart = 0;
     buffer->bytesRead = 0;
+
+    // Clear timer info
+    if (buffer->timeoutData->timer != nullptr) {
+        if (xTimerStop(buffer->timeoutData->timer, 0) != pdPASS ||
+            xTimerDelete(buffer->timeoutData->timer, 0) != pdPASS) {
+            LOG(
+                Serial.println("Failed to stop and/or delete timer. Timer "
+                               "queue might be full"));
+        }
+    }
+    buffer->timeoutData->timer = nullptr;
+
+    delete buffer->timeoutData;
+    buffer->timeoutData = nullptr;
 }
 
 /**

@@ -96,8 +96,9 @@ void createDevice() {
     memcpy(&discoveryPayload.origin, origin, sizeof(HAOrigin));
     memcpy(&discoveryPayload.cmps, components, sizeof(HAComponent) * 2);
 
-    HAMessage* msg = new HAMessage(MessageType::DISCOVERY_PAYLOAD);
-    msg->discovery = discoveryPayload;
+    HAMessage* msg = new HAMessage;
+    msg->messageType = MessageType::DISCOVERY_PAYLOAD;
+    msg->payload.discovery = discoveryPayload;
 
     EspNowChunker chunker;
     chunker.send(destinationMac, (uint8_t*)msg, sizeof(*msg));
@@ -107,7 +108,7 @@ void createDevice() {
     delete[] components;
 }
 
-void sendCallback(uint8_t* mac, uint8_t sendStatus) {
+void sendCallback(uint8_t* mac __attribute__((unused)), uint8_t sendStatus) {
     Serial.printf("Last message sent status: %d", sendStatus);
 }
 

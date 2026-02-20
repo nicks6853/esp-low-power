@@ -99,5 +99,6 @@ void loop() {
     currentTime = millis();
     if (currentTime - lastAction > 2000) {
         lastAction = currentTime;
+        LOG(Serial.printf("Heap size: %d\n", ESP.getFreeHeap()));
     }
 }
