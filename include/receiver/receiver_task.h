@@ -3,17 +3,11 @@
 #include <Arduino.h>
 
 #include "chunker.h"
-#include "config.h"
 #include "message_type.h"
 
 #define MAX_ACTIVE_BUFFER_COUNT 5
 #define PAYLOAD_TIMEOUT 200
-
-#ifdef DEBUG
-#define LOG(x) x
-#else
-#define LOG(X) (void)0
-#endif
+#define MAX_CALLBACK_FUNCTIONS 1
 
 /**
  * Struct representing one of the active buffers that is
@@ -37,11 +31,19 @@ struct esp_now_message_t {
     size_t length;
 };
 
+/**
+ * Function type for callback called when a complete message
+ * is pieced together from chunks.
+ */
+typedef void (*onCompleteCallback)(const HAMessage* incomingMsg);
+
 class ReceiverTask {
    private:
     QueueHandle_t _procQueue;
     TaskHandle_t _task;
     ActiveBuffer _activeBuffers[MAX_ACTIVE_BUFFER_COUNT];
+    onCompleteCallback _callbacks[MAX_CALLBACK_FUNCTIONS];
+    size_t _registeredCallbacksCount = 0;
 
     HAMessage* _handleChunk(EspNowChunk& chunk);
     ActiveBuffer* _findActiveBuffer(uint64_t chipId);
@@ -51,5 +53,6 @@ class ReceiverTask {
     ReceiverTask(const char* name, uint16_t stackSize, UBaseType_t priority);
     static void taskBody(void* pvParameters);
     void pushMsg(esp_now_message_t msg);
+    void registerCompleteCallback(onCompleteCallback func);
 };
 #endif

@@ -29,17 +29,18 @@ void ReceiverTask::taskBody(void* pvParameters) {
     while (true) {
         if (xQueueReceive(instance->_procQueue, &receivedMsg, portMAX_DELAY) ==
             pdTRUE) {
-            LOG(Serial.println("Processing queue message"));
-
             EspNowChunk currentChunk;
             memcpy(&currentChunk, receivedMsg.payload, receivedMsg.length);
 
             HAMessage* completeMsg = instance->_handleChunk(currentChunk);
 
             if (completeMsg != nullptr) {
-                LOG(Serial.println("Received complete message"));
-                LOG(Serial.printf("Message type: %d",
-                                  (uint8_t)completeMsg->messageType));
+                // Call all registered callback functions with the complete
+                // message
+                for (size_t i = 0; i < instance->_registeredCallbacksCount;
+                     i++) {
+                    instance->_callbacks[i](completeMsg);
+                }
 
                 delete completeMsg;
             }
@@ -83,7 +84,6 @@ HAMessage* ReceiverTask::_handleChunk(EspNowChunk& chunk) {
 
     if (activeBuffer->chunksRead == chunk.totalChunks) {
         LOG(Serial.println("Finished reading payload"));
-        LOG(Serial.println("Validating checksum..."));
 
         // Validate the checksum
         uint8_t checksum = chunk.checksum;
@@ -159,4 +159,22 @@ void ReceiverTask::pushMsg(esp_now_message_t msg) {
     if (xQueueSend(this->_procQueue, &msg, 0) != pdTRUE) {
         LOG(Serial.println("Queue is full! Unable to process message"));
     }
+}
+
+/**
+ * Registers a callback function that will be called with
+ * complete messages as they are pieced together.
+ * @param func The function to call when a message is complete
+ */
+void ReceiverTask::registerCompleteCallback(onCompleteCallback func) {
+    if (this->_registeredCallbacksCount >= MAX_CALLBACK_FUNCTIONS) {
+        LOG(
+            Serial.printf("Max amount of callbacks %d hit! Unable to register "
+                          "callback function\n",
+                          MAX_CALLBACK_FUNCTIONS));
+        return;
+    }
+
+    LOG(Serial.println("Registering callback function"));
+    this->_callbacks[this->_registeredCallbacksCount++] = func;
 }

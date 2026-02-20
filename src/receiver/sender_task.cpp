@@ -26,12 +26,18 @@ SenderTask::SenderTask(const char* name, uint16_t stackSize,
  */
 void SenderTask::taskBody(void* pvParameters) {
     SenderTask* instance = (SenderTask*)pvParameters;
-    HAMessage* receivedMsg;
+    HAMessage* receivedMsg = new HAMessage;
 
     while (true) {
-        if (xQueueReceive(instance->_procQueue, &receivedMsg, portMAX_DELAY) ==
+        if (xQueueReceive(instance->_procQueue, receivedMsg, portMAX_DELAY) ==
             pdTRUE) {
-            LOG(Serial.println("Processing queue message"));
+            LOG(Serial.println("SENDER - Processing queue message"));
+            LOG(Serial.printf("Message RECEIVED TYPE: %d\n",
+                              (uint8_t)receivedMsg->messageType));
+
+            // Cleanup
+            delete receivedMsg;
+            receivedMsg = nullptr;
         }
     }
 }
@@ -47,8 +53,8 @@ void SenderTask::_handleMessage(HAMessage* msg) {}
  * task
  * @param msg The message to push to the queue.
  */
-void SenderTask::pushMsg(HAMessage msg) {
-    if (xQueueSend(this->_procQueue, &msg, 0) != pdTRUE) {
+void SenderTask::pushMsg(const HAMessage* msg) {
+    if (xQueueSend(this->_procQueue, msg, 0) != pdTRUE) {
         LOG(Serial.println("Queue is full! Unable to process message"));
     }
 }

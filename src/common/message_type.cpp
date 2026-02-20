@@ -73,37 +73,3 @@ JsonDocument toJSON(HAComponentOptions item) {
 
     return jsonPayload;
 }
-
-HAMessage::HAMessage(MessageType msgType) : messageType(msgType) {
-    switch (this->messageType) {
-        case MessageType::STATE_UPDATE_FLOAT:
-            this->stateUpdateF = HAStateUpdate<float>{};
-            break;
-        case MessageType::STATE_UPDATE_INT:
-            this->stateUpdateI = HAStateUpdate<int>{};
-            break;
-        case MessageType::STATE_UPDATE_CHAR_128:
-            this->stateUpdateS = HAStateUpdate<char[128]>{};
-            break;
-        case MessageType::DISCOVERY_PAYLOAD:
-            this->discovery = HADiscoveryPayload{};
-            break;
-        default:
-            Serial.println("Unknown message type in HAMessage constructor");
-            break;
-    }
-}
-
-/**
- * @brief Destructor for the HAMessage struct
- */
-HAMessage::~HAMessage() {
-    switch (this->messageType) {
-        case MessageType::DISCOVERY_PAYLOAD: {
-            this->discovery.~HADiscoveryPayload();
-            break;
-        }
-        default:
-            break;
-    }
-}

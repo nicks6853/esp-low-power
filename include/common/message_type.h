@@ -91,8 +91,5 @@ struct HAMessage {
         HAStateUpdate<char[128]> stateUpdateS;
         HADiscoveryPayload discovery;
     };
-
-    HAMessage(MessageType msgType);
-    ~HAMessage();
 };
 #endif
