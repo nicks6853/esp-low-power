@@ -8,12 +8,84 @@
 #include "mqtt_client.h"
 
 /**
+ * Forward declarations
+ */
+JsonDocument toJSON(HAOrigin item);
+JsonDocument toJSON(HADiscoveryPayload item);
+JsonDocument toJSON(HAComponentOptions item);
+
+/**
+ * @brief Converts the object to a JSON document.
+ * @param item The HADiscoveryPayload to convert to JSON
+ * @return The JSON document (smart pointer)
+ */
+JsonDocument toJSON(HADiscoveryPayload item) {
+    JsonDocument jsonPayload;
+
+    JsonObject dev = jsonPayload["dev"].to<JsonObject>();
+    dev["ids"] = item.dev.ids;
+    dev["name"] = item.dev.name;
+    dev["mf"] = item.dev.mf;
+    dev["mdl"] = item.dev.mdl;
+
+    // TODO: Make item.origin optional in HADiscoveryPayload
+    jsonPayload["o"] = toJSON(item.origin);
+
+    // If there are components, convert them to JSON
+    if (item.cmpCount > 0) {
+        JsonObject cmps = jsonPayload["cmps"].to<JsonObject>();
+
+        for (size_t i = 0; i < item.cmpCount; i++) {
+            HAComponent component = item.cmps[i];
+
+            const char* key = component.key;
+            HAComponentOptions value = component.value;
+
+            cmps[key] = toJSON(value);
+        }
+    }
+
+    return jsonPayload;
+}
+
+/**
+ * @brief Converts the object to a JSON document.
+ * @param item The HAOrigin to convert to JSON
+ * @return The JSON document (smart pointer)
+ */
+JsonDocument toJSON(HAOrigin item) {
+    JsonDocument jsonPayload;
+    jsonPayload["name"] = item.name;
+    jsonPayload["sw"] = item.sw;
+    jsonPayload["url"] = item.url;
+
+    return jsonPayload;
+}
+
+/**
+ * @brief Converts the object to a JSON document.
+ * @param item The HAComponentOptions to convert to JSON
+ * @return The JSON document (smart pointer)
+ */
+JsonDocument toJSON(HAComponentOptions item) {
+    JsonDocument jsonPayload;
+    jsonPayload["p"] = item.p;
+    jsonPayload["dev_cla"] = item.dev_cla;
+    jsonPayload["uniq_id"] = item.uniq_id;
+    jsonPayload["stat_t"] = item.stat_t;
+    jsonPayload["unit_of_meas"] = item.unit_of_meas;
+    jsonPayload["name"] = item.name;
+
+    return jsonPayload;
+}
+
+/**
  * @brief Publishes a discovery message to Home Assistant's MQTT integration
  * @param discoveryPayload The discovery payload to send to HA
  * @return a 1 indicating success, 0 indicating failure.
  */
 uint8_t HAManager::discovery(HADiscoveryPayload discoveryPayload) {
-    JsonDocument jsonPayload = discoveryPayload.toJSON();
+    JsonDocument jsonPayload = toJSON(discoveryPayload);
 
     char topic[255];
     snprintf(topic, sizeof(topic), "%s/device/%s/config", HA_DISCOVERY_PREFIX,

@@ -78,6 +78,10 @@ void setup() {
     while (!Serial);
 #endif
 
+    Serial2.begin(ESP_BAUD_RATE);
+
+    while (!Serial2);
+
     LOG(Serial.println("Serial is ready!"));
 
     // Start background task to process espnow message

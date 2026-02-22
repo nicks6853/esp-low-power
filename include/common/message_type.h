@@ -4,7 +4,6 @@
 #include <ArduinoJson.h>
 
 #include "config.h"
-#include "serializable.h"
 
 /**
  * For more information about the definitions of terms,
@@ -17,6 +16,21 @@
  * being provided in HAStateUpdate structs.
  */
 enum class ValueType : uint8_t { INT, FLOAT, BOOL, CHAR_128 };
+
+/**
+ * Different message types that a HAMessage
+ * struct can contain.
+ */
+enum class MessageType : uint8_t {
+    DEVICE,
+    COMPONENT_OPTIONS,
+    ORIGIN,
+    DISCOVERY_PAYLOAD,
+    STATE_UPDATE_FLOAT,
+    STATE_UPDATE_INT,
+    STATE_UPDATE_BOOL,
+    STATE_UPDATE_CHAR_128,
+};
 
 /**
  * Represents a device in Home Assistant's MQTT integration

@@ -1,5 +1,6 @@
 #include "sender_task.h"
 
+#include "constants.h"
 #include "message_type.h"
 
 SenderTask::SenderTask(const char* name, uint16_t stackSize,
@@ -31,9 +32,7 @@ void SenderTask::taskBody(void* pvParameters) {
     while (true) {
         if (xQueueReceive(instance->_procQueue, receivedMsg, portMAX_DELAY) ==
             pdTRUE) {
-            LOG(Serial.println("SENDER - Processing queue message"));
-            LOG(Serial.printf("Message RECEIVED TYPE: %d\n",
-                              (uint8_t)receivedMsg->messageType));
+            instance->_handleMessage(receivedMsg);
         }
     }
 }
@@ -42,7 +41,13 @@ void SenderTask::taskBody(void* pvParameters) {
  * Given a message, handle sending it to over the Serial connection
  * @param msg The message to handle.
  */
-void SenderTask::_handleMessage(HAMessage* msg) {}
+void SenderTask::_handleMessage(const HAMessage* msg) {
+    LOG(Serial.println("Sending message over Serial"));
+    Serial2.write(MESSAGE_START);
+    Serial2.write((uint8_t*)msg, sizeof(HAMessage));
+    Serial2.write(MESSAGE_END);
+    LOG(Serial.println("Finished sending message over Serial"));
+}
 
 /**
  * Pushes an  espnow message to the queue to be processed by this background

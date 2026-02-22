@@ -4,9 +4,8 @@
 #include <Arduino.h>
 
 #include "message_type.h"
-#include "serializable.h"
 
-enum SerialCommunicatorState { IDLE, WAIT_FOR_TYPE, READING };
+enum SerialCommunicatorState { IDLE, READING };
 
 class SerialCommunicator {
    private:
@@ -25,8 +24,6 @@ class SerialCommunicator {
 
    public:
     SerialCommunicator(HardwareSerial& serial) : _serial(serial) {};
-
-    void write(const Serializable& body);
 
     HAMessage* read();
 };

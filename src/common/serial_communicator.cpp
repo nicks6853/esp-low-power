@@ -4,13 +4,6 @@
 
 #include "constants.h"
 #include "message_type.h"
-#include "serializable.h"
-
-void SerialCommunicator::write(const Serializable& body) {
-    this->_serial.write(MESSAGE_START);
-    body.write(this->_serial);
-    this->_serial.write(MESSAGE_END);
-}
 
 void SerialCommunicator::_flushSerial() {
     Serial.println("Flushing serial buffer...");
@@ -20,6 +13,10 @@ void SerialCommunicator::_flushSerial() {
     Serial.println("Buffer flushed");
 }
 
+/**
+ * Resets the serial communicator. Clears the read buffer,
+ * tracking indices and current state.
+ */
 void SerialCommunicator::_reset() {
     /**
      * Intentionally reset the buffer
@@ -34,29 +31,19 @@ void SerialCommunicator::_reset() {
     this->_currentState = SerialCommunicatorState::IDLE;
 }
 
+/**
+ * @brief Handles the idle state, waiting for a message come in.
+ */
 void SerialCommunicator::_handleIdle() {
     uint8_t incomingByte = this->_serial.read();
     if (incomingByte == MESSAGE_START) {
         Serial.println("Started reading");
 
-        this->_currentState = SerialCommunicatorState::WAIT_FOR_TYPE;
         this->_readIndex = 0;
+        this->_readSize = sizeof(HAMessage);
+        this->_readBuffer = new uint8_t[sizeof(HAMessage)];
+        this->_currentState = SerialCommunicatorState::READING;
     }
-}
-
-/**
- * @brief Handles the "wait for type" state of the serial communicator.
- * Waits for the byte that indicates what type of struct is coming
- * comes in.
- */
-void SerialCommunicator::_handleWaitForType() {
-    uint8_t incomingByte = this->_serial.read();
-    Serial.println(incomingByte);
-    this->_readMessageType = (MessageType)incomingByte;
-    Serial.printf("Message type: %d\n", (uint8_t)this->_readMessageType);
-    this->_readSize = sizeof(HAMessage);
-    this->_readBuffer = new uint8_t[sizeof(HAMessage)];
-    this->_currentState = SerialCommunicatorState::READING;
 }
 
 /**
@@ -109,10 +96,6 @@ HAMessage* SerialCommunicator::read() {
         switch (this->_currentState) {
             case SerialCommunicatorState::IDLE: {
                 this->_handleIdle();
-                break;
-            }
-            case SerialCommunicatorState::WAIT_FOR_TYPE: {
-                this->_handleWaitForType();
                 break;
             }
             case SerialCommunicatorState::READING: {

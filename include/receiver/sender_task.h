@@ -9,7 +9,7 @@ class SenderTask {
     QueueHandle_t _procQueue;
     TaskHandle_t _task;
 
-    void _handleMessage(HAMessage* msg);
+    void _handleMessage(const HAMessage* msg);
 
    public:
     SenderTask(const char* name, uint16_t stackSize, UBaseType_t priority);

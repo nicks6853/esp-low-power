@@ -55,13 +55,15 @@ void loop() {
         Serial.println("Forwarding result to Home Assistant");
         switch (result->messageType) {
             case MessageType::DISCOVERY_PAYLOAD: {
-                Serial.printf("%s", result->discovery.dev.mdl);
-                Serial.printf("%s", result->discovery.origin.name);
-                Serial.printf("%d", result->discovery.cmpCount);
-                Serial.printf("%s", result->discovery.cmps[0].key);
-                Serial.printf("%s", result->discovery.cmps[0].value.name);
-                Serial.printf("%s", result->discovery.cmps[0].value.stat_t);
-                if (homeAssistant.discovery(result->discovery)) {
+                Serial.printf("%s", result->payload.discovery.dev.mdl);
+                Serial.printf("%s", result->payload.discovery.origin.name);
+                Serial.printf("%d", result->payload.discovery.cmpCount);
+                Serial.printf("%s", result->payload.discovery.cmps[0].key);
+                Serial.printf("%s",
+                              result->payload.discovery.cmps[0].value.name);
+                Serial.printf("%s",
+                              result->payload.discovery.cmps[0].value.stat_t);
+                if (homeAssistant.discovery(result->payload.discovery)) {
                     Serial.println("Published discovery successfully");
                 } else {
                     Serial.println("Failed to publish discovery");
@@ -69,7 +71,8 @@ void loop() {
                 break;
             }
             case MessageType::STATE_UPDATE_FLOAT: {
-                if (homeAssistant.publishStateUpdate(result->stateUpdateF)) {
+                if (homeAssistant.publishStateUpdate(
+                        result->payload.stateUpdateF)) {
                     Serial.println("Published state update successfully");
                 } else {
                     Serial.printf("Failed to publish state update of type %d\n",
