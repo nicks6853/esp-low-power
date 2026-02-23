@@ -8,7 +8,7 @@ interval or when triggered by some external factor.
 The system consists of three main parts. A minimal example would look like this.
 
 1. Edge Device - ESP8266
-2. Receiver - ESP8266
+2. Receiver - ESP32
 3. Router - ESP32
 
 The receiver and router are connected together via a serial connection in a "hub" somewhere in the building.
