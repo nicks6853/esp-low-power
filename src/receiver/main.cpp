@@ -3,6 +3,7 @@
 #include <esp_now.h>
 
 #include "config.h"
+#include "hal/uart_types.h"
 #include "receiver_task.h"
 #include "sender_task.h"
 
@@ -78,8 +79,10 @@ void setup() {
     while (!Serial);
 #endif
 
+    // Start serial connection with CTS/RTS pins
+    Serial2.setPins(RX2, TX2, RECEIVER_CTS, RECEIVER_RTS);
+    Serial2.setHwFlowCtrlMode(UART_HW_FLOWCTRL_CTS_RTS);
     Serial2.begin(ESP_BAUD_RATE);
-
     while (!Serial2);
 
     LOG(Serial.println("Serial is ready!"));

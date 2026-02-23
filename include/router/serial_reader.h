@@ -1,16 +1,16 @@
-#ifndef SERIALCOMMUNICATOR_H
-#define SERIALCOMMUNICATOR_H
+#ifndef SERIALREADER_H
+#define SERIALREADER_H
 
 #include <Arduino.h>
 
 #include "message_type.h"
 
-enum SerialCommunicatorState { IDLE, READING };
+enum SerialReaderState { IDLE, READING };
 
-class SerialCommunicator {
+class SerialReader {
    private:
     HardwareSerial& _serial;
-    SerialCommunicatorState _currentState = IDLE;
+    SerialReaderState _currentState = IDLE;
     size_t _readIndex = 0;
     uint8_t* _readBuffer = nullptr;
     size_t _readSize = 0;
@@ -23,7 +23,7 @@ class SerialCommunicator {
     HAMessage* _handleReading();
 
    public:
-    SerialCommunicator(HardwareSerial& serial) : _serial(serial) {};
+    SerialReader(HardwareSerial& serial) : _serial(serial) {};
 
     HAMessage* read();
 };

@@ -1,11 +1,11 @@
-#include "serial_communicator.h"
+#include "serial_reader.h"
 
 #include <Arduino.h>
 
 #include "constants.h"
 #include "message_type.h"
 
-void SerialCommunicator::_flushSerial() {
+void SerialReader::_flushSerial() {
     Serial.println("Flushing serial buffer...");
     while (this->_serial.available() > 0) {
         this->_serial.read();
@@ -14,10 +14,10 @@ void SerialCommunicator::_flushSerial() {
 }
 
 /**
- * Resets the serial communicator. Clears the read buffer,
+ * Resets the serial reader. Clears the read buffer,
  * tracking indices and current state.
  */
-void SerialCommunicator::_reset() {
+void SerialReader::_reset() {
     /**
      * Intentionally reset the buffer
      * without deleting the data on the heap
@@ -28,13 +28,13 @@ void SerialCommunicator::_reset() {
     this->_readIndex = 0;
     this->_readSize = 0;
 
-    this->_currentState = SerialCommunicatorState::IDLE;
+    this->_currentState = SerialReaderState::IDLE;
 }
 
 /**
  * @brief Handles the idle state, waiting for a message come in.
  */
-void SerialCommunicator::_handleIdle() {
+void SerialReader::_handleIdle() {
     uint8_t incomingByte = this->_serial.read();
     if (incomingByte == MESSAGE_START) {
         Serial.println("Started reading");
@@ -42,7 +42,7 @@ void SerialCommunicator::_handleIdle() {
         this->_readIndex = 0;
         this->_readSize = sizeof(HAMessage);
         this->_readBuffer = new uint8_t[sizeof(HAMessage)];
-        this->_currentState = SerialCommunicatorState::READING;
+        this->_currentState = SerialReaderState::READING;
     }
 }
 
@@ -50,7 +50,7 @@ void SerialCommunicator::_handleIdle() {
  * @brief Handles reading HAMesages from the Serial connection.
  * @return A 1 or 0 indicating success or failure.
  */
-HAMessage* SerialCommunicator::_handleReading() {
+HAMessage* SerialReader::_handleReading() {
     // Save to our buffer
     size_t amountRead =
         this->_serial.readBytes(this->_readBuffer + this->_readIndex,
@@ -91,14 +91,14 @@ HAMessage* SerialCommunicator::_handleReading() {
  * @brief Reads incoming HAMessage structs on the Serial connection.
  * @return Returns a pointer to the item read, or nullptr if nothing was read
  */
-HAMessage* SerialCommunicator::read() {
+HAMessage* SerialReader::read() {
     if (this->_serial.available() > 0) {
         switch (this->_currentState) {
-            case SerialCommunicatorState::IDLE: {
+            case SerialReaderState::IDLE: {
                 this->_handleIdle();
                 break;
             }
-            case SerialCommunicatorState::READING: {
+            case SerialReaderState::READING: {
                 return this->_handleReading();
                 break;
             }

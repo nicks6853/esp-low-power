@@ -61,7 +61,7 @@ void ReceiverTask::_requestTimeoutCallback(TimerHandle_t xTimer) {
     LOG(
         Serial.printf("Payload took longer than %dms to come in, clearing "
                       "buffer for chip: 0x%016llX\n",
-                      PAYLOAD_TIMEOUT, activeBuffer->chipId));
+                      PAYLOAD_TIMEOUT, activeBuffer->msgId));
     instance->_resetActiveBuffer(activeBuffer);
 }
 
@@ -72,13 +72,13 @@ void ReceiverTask::_requestTimeoutCallback(TimerHandle_t xTimer) {
  * the message is not complete yet.
  */
 HAMessage* ReceiverTask::_handleChunk(EspNowChunk& chunk) {
-    ActiveBuffer* activeBuffer = this->_findActiveBuffer(chunk.chipId);
+    ActiveBuffer* activeBuffer = this->_findActiveBuffer(chunk.msgId);
 
     // If the buffer is nullptr, initialize it, this is a new message
     if (activeBuffer->buffer == nullptr) {
         LOG(Serial.println("New message received, initializing buffer."));
         activeBuffer->buffer = new uint8_t[chunk.totalLen];
-        activeBuffer->chipId = chunk.chipId;
+        activeBuffer->msgId = chunk.msgId;
         activeBuffer->chunksRead = 0;
 
         // Start the timer to clear buffer if no data is received for x ms
@@ -143,18 +143,18 @@ HAMessage* ReceiverTask::_handleChunk(EspNowChunk& chunk) {
 /**
  * Given a chunk ID, finds the current active buffer for that chip,
  * or returns an empty buffer.
- * @param chipId The ID of the chip, coming from the chunk received over espnow
+ * @param msgId The ID of the chip, coming from the chunk received over espnow
  * @return A pointer to the active buffer or an available buffer.
  */
-ActiveBuffer* ReceiverTask::_findActiveBuffer(uint64_t chipId) {
+ActiveBuffer* ReceiverTask::_findActiveBuffer(uint64_t msgId) {
     ActiveBuffer* firstAvailableBuffer = nullptr;
 
     for (size_t i = 0; i < sizeof(this->_activeBuffers) / sizeof(ActiveBuffer);
          i++) {
-        if (this->_activeBuffers[i].chipId == chipId) {
+        if (this->_activeBuffers[i].msgId == msgId) {
             return &this->_activeBuffers[i];
         } else if (firstAvailableBuffer == nullptr &&
-                   this->_activeBuffers[i].chipId == 0) {
+                   this->_activeBuffers[i].msgId == 0) {
             firstAvailableBuffer = &this->_activeBuffers[i];
         }
     }
@@ -174,7 +174,7 @@ void ReceiverTask::_resetActiveBuffer(ActiveBuffer* buffer, bool free) {
     }
     buffer->buffer = nullptr;
     buffer->chunksRead = 0;
-    buffer->chipId = 0;
+    buffer->msgId = 0;
     buffer->bytesRead = 0;
 
     // Clear timer info
@@ -199,7 +199,8 @@ void ReceiverTask::_resetActiveBuffer(ActiveBuffer* buffer, bool free) {
  */
 void ReceiverTask::pushMsg(esp_now_message_t msg) {
     if (xQueueSend(this->_procQueue, &msg, 0) != pdTRUE) {
-        LOG(Serial.println("Queue is full! Unable to process message"));
+        LOG(Serial.println(
+            "receiver_task - Queue is full! Unable to process message"));
     }
 }
 

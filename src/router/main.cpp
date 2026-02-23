@@ -8,50 +8,26 @@
 #include "config_template.h"
 #include "ha_manager.h"
 #include "mqtt_client.h"
-#include "serial_communicator.h"
+#include "serial_reader.h"
 #include "wifi_manager.h"
 #define READ_INTERVAL 60000
 
 WifiManager wifiManager(WIFI_SSID, WIFI_PASSWORD);
 MqttClient mqttClient(MQTT_BROKER, MQTT_USER, MQTT_PASSWORD, MQTT_PORT);
 HAManager homeAssistant(mqttClient);
-SerialCommunicator serialCommunicator(Serial2);
-unsigned long lastPrint = 0;
+SerialReader* serialReader = new SerialReader(Serial2);
+unsigned long lastAction = 0;
+unsigned long currentTime;
 
-void setup() {
-    Serial.begin(ESP_BAUD_RATE);
-    Serial2.begin(ESP_BAUD_RATE, SERIAL_8N1, RX2,
-                  TX2);  // Serial connection to the other ESP
-
-    while (!Serial || !Serial2);
-    Serial.println("Serial ready!");
-
-    wifiManager.connect();
-    mqttClient.connect();
-
-    Serial2.write(XON);
-}
-
-void loop() {
-    unsigned long currentTime = millis();
-
-    if (currentTime - lastPrint >= 1000) {
-        Serial.println(
-            "===============================================================");
-        Serial.printf("HeapMemory: %d\n", ESP.getHeapSize());
-        Serial.println(
-            "===============================================================");
-        lastPrint = currentTime;
-    }
-
-    mqttClient.check_connection();
-    wifiManager.check_connection();
-
-    HAMessage* result = serialCommunicator.read();
+/**
+ * Checks the serial connection to see if any result
+ * came from it. If a message came in, publishes it to home
+ * assistant.
+ */
+void processSerial() {
+    HAMessage* result = serialReader->read();
 
     if (result != nullptr) {
-        // Send XOFF signal
-        Serial2.write(XOFF);
         Serial.println("Forwarding result to Home Assistant");
         switch (result->messageType) {
             case MessageType::DISCOVERY_PAYLOAD: {
@@ -89,8 +65,40 @@ void loop() {
 
         // Clean up data on heap
         delete result;
-
-        // Send XON signal to say we are ready to read more.
-        Serial2.write(XON);
     }
+}
+
+void setup() {
+#if defined(DEBUG) && DEBUG == 1
+    Serial.begin(ESP_BAUD_RATE);
+    while (!Serial);
+#endif
+    LOG(Serial.println("Serial ready!"));
+
+    // Start serial connection with CTS/RTS pins
+    Serial2.setPins(RX2, TX2, ROUTER_CTS, ROUTER_RTS);
+    Serial2.setHwFlowCtrlMode(UART_HW_FLOWCTRL_CTS_RTS);
+    Serial2.begin(ESP_BAUD_RATE);
+    while (!Serial2);
+
+    wifiManager.connect();
+    mqttClient.connect();
+}
+
+void loop() {
+    currentTime = millis();
+
+    if (currentTime - lastAction >= 1000) {
+        Serial.println(
+            "===============================================================");
+        Serial.printf("HeapMemory: %d\n", ESP.getHeapSize());
+        Serial.println(
+            "===============================================================");
+        lastAction = currentTime;
+    }
+
+    mqttClient.check_connection();
+    wifiManager.check_connection();
+
+    processSerial();
 }

@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
+#include <Wire.h>
 #include <espnow.h>
 
 #include "BME280I2C.h"
@@ -37,6 +38,7 @@ void sendTemperature() {
     msg->payload.stateUpdateF = state;
 
     chunker.send(destinationMac, (uint8_t*)msg, sizeof(HAMessage));
+    delete msg;
 }
 
 void sendHumidity() {
@@ -57,6 +59,7 @@ void sendHumidity() {
     msg->payload.stateUpdateF = state;
 
     chunker.send(destinationMac, (uint8_t*)msg, sizeof(HAMessage));
+    delete msg;
 }
 
 void createDevice() {
@@ -149,10 +152,27 @@ uint8_t initializeEspNow() {
     return 1;
 }
 
+/**
+ * Initializes the BME280 sensor for
+ * humidity and temperature readings
+ */
+void initializeBme() {
+    Wire.begin();
+    while (!bme.begin()) {
+        LOG(Serial.println("Could not find BME280 sensor!"));
+        delay(1000);
+    }
+}
+
 void setup() {
     Serial.begin(ESP_BAUD_RATE);
     while (!Serial);
     Serial.println("Serial ready!");
+
+    // Set the random seed
+    randomSeed(analogRead(A0) + micros());
+
+    initializeBme();
 
     initializeEspNow();
 

@@ -28,7 +28,7 @@ struct RequestTimeoutData {
  * recording chunks from messages coming from edge devices.
  */
 struct ActiveBuffer {
-    uint64_t chipId = 0;
+    uint64_t msgId = 0;
     uint8_t* buffer = nullptr;
     size_t chunksRead = 0;
     size_t bytesRead = 0;
@@ -60,7 +60,7 @@ class ReceiverTask {
     size_t _registeredCallbacksCount = 0;
 
     HAMessage* _handleChunk(EspNowChunk& chunk);
-    ActiveBuffer* _findActiveBuffer(uint64_t chipId);
+    ActiveBuffer* _findActiveBuffer(uint64_t msgId);
     void _resetActiveBuffer(ActiveBuffer* buffer, bool free = true);
     static void _requestTimeoutCallback(TimerHandle_t xTimer);
     static void _taskBody(void* pvParameters);

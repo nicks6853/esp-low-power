@@ -11,6 +11,7 @@ void EspNowChunker::send(uint8_t* destinationMac, uint8_t* payload,
     uint8_t checksum = this->_calculateChecksum(payload, len);
     size_t currentChunkSize;
     size_t remainingSize;
+    uint32_t randomId = this->_generateId();
     uint8_t* end = payload + len;
     size_t totalChunks =
         (len + CHUNK_SIZE - 1) /
@@ -22,11 +23,7 @@ void EspNowChunker::send(uint8_t* destinationMac, uint8_t* payload,
             remainingSize < CHUNK_SIZE ? remainingSize : CHUNK_SIZE;
 
         EspNowChunk chunk;
-#if defined(ESP32)
-        chunk.chipId = ESP.getEfuseMac();
-#elif defined(ESP8266)
-        chunk.chipId = ESP.getChipId();
-#endif
+        chunk.msgId = randomId;
         chunk.checksum = checksum;
         chunk.totalChunks = totalChunks;
         chunk.chunkIndex = ptr - payload;
@@ -52,4 +49,14 @@ uint8_t EspNowChunker::_calculateChecksum(const uint8_t* buffer, size_t len) {
     }
 
     return checksum;
+}
+
+/**
+ * @brief Generates a random 32 bit ID
+ * @return A random 32 bit ID
+ */
+uint32_t EspNowChunker::_generateId() {
+    uint32_t high = random(0, 65536);
+    uint32_t low = random(0, 65536);
+    return (high << 16) | low;
 }

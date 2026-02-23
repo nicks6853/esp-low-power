@@ -56,6 +56,7 @@ void SenderTask::_handleMessage(const HAMessage* msg) {
  */
 void SenderTask::pushMsg(const HAMessage* msg) {
     if (xQueueSend(this->_procQueue, msg, 0) != pdTRUE) {
-        LOG(Serial.println("Queue is full! Unable to process message"));
+        LOG(Serial.println(
+            "sender_task - Queue is full! Unable to process message"));
     }
 }

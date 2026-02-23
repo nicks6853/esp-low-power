@@ -13,12 +13,22 @@
 
 // ======================== ESP Config ======================== //
 #define ESP_BAUD_RATE 115200
+#define ROUTER_CTS 19
+#define ROUTER_RTS 18
+#define RECEIVER_CTS 18
+#define RECEIVER_RTS 19
 
 // ======================== Home Assistant ======================== //
 #define HA_DISCOVERY_PREFIX "homeassistant"
 #define HA_MAX_COMPONENT_PER_DEVICE 5
 
-#define XOFF 0x13
-#define XON 0x11
+// ======================== Debug Settings ======================== //
+#define DEBUG 1
+
+#if defined(DEBUG) && DEBUG == 1
+#define LOG(x) x
+#else
+#define LOG(x) (void)0
+#endif
 
 #endif
