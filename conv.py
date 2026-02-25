@@ -1,9 +1,10 @@
 ####
 # Credits: https://github.com/anurag3301
-###
+####
 
 import json
 import subprocess
+import shlex
 from pathlib import Path
 
 # Constants
@@ -31,38 +32,69 @@ def extract_compiler():
 def parse_ccls():
     common_flags = []
     cpp_flags = []
+
     with open(CCLS_FILE) as f:
         for line in f:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            if line.startswith("%cpp"):
-                cpp_flags.extend(
-                    [
-                        flag
-                        for flag in line.split()[1:]
-                        if flag == "-Wall" or flag.startswith(KEEP_FLAGS)
-                    ]
-                )
-            elif line.startswith("%c"):
-                pass  # skip C files for now
-            elif not line.startswith("%"):
-                common_flags.extend(
-                    [
-                        flag
-                        for flag in line.split()
-                        if flag == "-Wall" or flag.startswith(KEEP_FLAGS)
-                    ]
-                )
-    return common_flags + cpp_flags
 
+            tokens = line.split()  # simple split
+
+            if tokens[0].startswith("%cpp"):
+                flags = tokens[1:]
+                target = cpp_flags
+            elif tokens[0].startswith("%c"):
+                continue
+            elif not tokens[0].startswith("%"):
+                flags = tokens
+                target = common_flags
+            else:
+                continue
+
+            i = 0
+            while i < len(flags):
+                flag = flags[i]
+
+                # Handle separated -I /path
+                if flag == "-I" and i + 1 < len(flags):
+                    combined = f"-I{flags[i + 1]}"
+                    target.append(combined)
+                    i += 2
+                    continue
+
+                # Handle -I/path with spaces
+                if flag.startswith("-I"):
+                    # combine all following tokens that don't start with '-' as part of path
+                    j = i + 1
+                    path_parts = []
+                    while j < len(flags) and not flags[j].startswith("-"):
+                        path_parts.append(flags[j])
+                        j += 1
+                    if path_parts:
+                        flag = flag + " " + " ".join(path_parts)
+                        i = j
+                        target.append(flag)
+                        continue
+
+                    target.append(flag)
+                    i += 1
+                    continue
+
+                # keep other flags
+                if flag == "-Wall" or flag.startswith(("-D", "-std")):
+                    target.append(flag)
+
+                i += 1
+
+    return common_flags + cpp_flags
 
 def generate_single_entry_compile_command(compiler, flags):
     entry = {
-        "directory": str(PROJECT_ROOT),
-        "file": str(SRC_FILE),
-        "command": f"{compiler} {' '.join(flags)} {SRC_FILE}",
-    }
+            "directory": str(PROJECT_ROOT),
+            "file": str(SRC_FILE),
+            "arguments": [compiler] + flags + [str(SRC_FILE)],
+            }
     CCDB_NEW.write_text(json.dumps([entry], indent=2))
     return 1
 

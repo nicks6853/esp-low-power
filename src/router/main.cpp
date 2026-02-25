@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <BME280I2C.h>
 #include <Wire.h>
 
 #include "HardwareSerial.h"
