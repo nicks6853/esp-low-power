@@ -33,6 +33,7 @@ void SenderTask::taskBody(void* pvParameters) {
         if (xQueueReceive(instance->_procQueue, receivedMsg, portMAX_DELAY) ==
             pdTRUE) {
             instance->_handleMessage(receivedMsg);
+            vTaskDelay(250 / portTICK_PERIOD_MS);
         }
     }
 }
@@ -45,7 +46,6 @@ void SenderTask::_handleMessage(const HAMessage* msg) {
     LOG(Serial.println("Sending message over Serial"));
     Serial2.write(MESSAGE_START);
     Serial2.write((uint8_t*)msg, sizeof(HAMessage));
-    Serial2.write(MESSAGE_END);
     LOG(Serial.println("Finished sending message over Serial"));
 }
 

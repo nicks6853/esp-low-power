@@ -60,23 +60,17 @@ HAMessage* SerialReader::_handleReading() {
     this->_readIndex += amountRead;
 
     if (this->_readIndex == this->_readSize) {
-        if (this->_serial.read() == MESSAGE_END) {
-            /**
-             * Here, we've read all the bytes, handle the different
-             * types and return the result as an HAMessage struct.
-             */
+        /**
+         * Here, we've read all the bytes, handle the different
+         * types and return the result as an HAMessage struct.
+         */
 
-            Serial.println("Read complete object");
-            HAMessage* returnPtr = (HAMessage*)this->_readBuffer;
+        Serial.println("Read complete object");
+        HAMessage* returnPtr = (HAMessage*)this->_readBuffer;
 
-            this->_reset();
+        this->_reset();
 
-            return returnPtr;
-        } else {
-            Serial.println("End marker missing (shifted data)");
-            delete[] this->_readBuffer;
-            this->_reset();
-        }
+        return returnPtr;
     } else {
         Serial.println("Timeout reached before struct was full.");
         this->_flushSerial();
