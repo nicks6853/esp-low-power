@@ -7,6 +7,7 @@
 #include "config_template.h"
 #include "ha_manager.h"
 #include "mqtt_client.h"
+#include "oled_terminal.h"
 #include "serial_reader.h"
 #include "wifi_manager.h"
 #define READ_INTERVAL 60000
@@ -14,6 +15,7 @@
 WifiManager wifiManager(WIFI_SSID, WIFI_PASSWORD);
 MqttClient mqttClient(MQTT_BROKER, MQTT_USER, MQTT_PASSWORD, MQTT_PORT);
 HAManager homeAssistant(mqttClient);
+OledTerminal* oledTerminal = new OledTerminal(128, 32, 0x3C);
 SerialReader* serialReader = new SerialReader(Serial2);
 unsigned long lastAction = 0;
 unsigned long currentTime;
@@ -30,40 +32,51 @@ void processSerial() {
         Serial.println("Forwarding result to Home Assistant");
         switch (result->messageType) {
             case MessageType::DISCOVERY_PAYLOAD: {
-                Serial.printf("%s", result->payload.discovery.dev.mdl);
-                Serial.printf("%s", result->payload.discovery.origin.name);
-                Serial.printf("%d", result->payload.discovery.cmpCount);
-                Serial.printf("%s", result->payload.discovery.cmps[0].key);
-                Serial.printf("%s",
-                              result->payload.discovery.cmps[0].value.name);
-                Serial.printf("%s",
-                              result->payload.discovery.cmps[0].value.stat_t);
+                LOG(Serial.printf("%s", result->payload.discovery.dev.mdl));
+                LOG(Serial.printf("%s", result->payload.discovery.origin.name));
+                LOG(Serial.printf("%d", result->payload.discovery.cmpCount));
+                LOG(Serial.printf("%s", result->payload.discovery.cmps[0].key));
+                LOG(Serial.printf(
+                    "%s", result->payload.discovery.cmps[0].value.name));
+                LOG(Serial.printf(
+                    "%s", result->payload.discovery.cmps[0].value.stat_t));
                 if (homeAssistant.discovery(result->payload.discovery)) {
-                    Serial.println("Published discovery successfully");
+                    LOG(Serial.println("Published discovery successfully"));
+                    oledTerminal->appendLine("Discovery");
                 } else {
-                    Serial.println("Failed to publish discovery");
+                    LOG(Serial.println("Failed to publish discovery"));
+                    oledTerminal->appendLine("Failed Discovery");
                 }
                 break;
             }
             case MessageType::STATE_UPDATE_FLOAT: {
                 if (homeAssistant.publishStateUpdate(
                         result->payload.stateUpdateF)) {
-                    Serial.println("Published state update successfully");
+                    LOG(Serial.println("Published state update successfully"));
+                    char msg[21];
+                    snprintf(msg, 21, "State Update: %.2f",
+                             result->payload.stateUpdateF.value);
+
+                    oledTerminal->appendLine(msg);
                 } else {
-                    Serial.printf("Failed to publish state update of type %d\n",
-                                  (uint8_t)result->messageType);
+                    LOG(Serial.printf(
+                        "Failed to publish state update of type %d\n",
+                        (uint8_t)result->messageType));
+                    oledTerminal->appendLine("Failed State Update");
                 }
                 break;
             }
             default: {
-                Serial.printf("Unhandle message type %d",
-                              (uint8_t)result->messageType);
+                LOG(Serial.printf("Unhandled message type %d",
+                                  (uint8_t)result->messageType));
+                oledTerminal->appendLine("Unhandled");
                 break;
             }
         }
 
         // Clean up data on heap
         delete result;
+        oledTerminal->draw();
     }
 }
 
@@ -82,6 +95,16 @@ void setup() {
 
     wifiManager.connect();
     mqttClient.connect();
+
+    if (!oledTerminal->begin()) {
+        LOG(Serial.println("Unable to initialize display"));
+        while (1) {
+            delay(1000);
+        }
+    }
+
+    oledTerminal->appendLine("Router started");
+    oledTerminal->draw();
 }
 
 void loop() {

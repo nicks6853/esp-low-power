@@ -1,7 +1,6 @@
 #ifndef MESSAGETYPE_H
 #define MESSAGETYPE_H
 #include <Arduino.h>
-#include <ArduinoJson.h>
 
 #include "config.h"
 
