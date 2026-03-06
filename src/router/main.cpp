@@ -34,10 +34,10 @@ void processSerial() {
             case MessageType::DISCOVERY_PAYLOAD: {
                 if (homeAssistant.discovery(result->payload.discovery)) {
                     LOG(Serial.println("Published discovery successfully"));
-                    oledTerminal->appendLine("DISCOVERY_SENT");
+                    oledTerminal->appendLine("Discovery");
                 } else {
                     LOG(Serial.println("Failed to publish discovery"));
-                    oledTerminal->appendLine("DISCOVERY_FAILED");
+                    oledTerminal->appendLine("Failed Discovery");
                 }
                 break;
             }
@@ -98,7 +98,11 @@ void processSerial() {
             default: {
                 LOG(Serial.printf("Unhandled message type %d",
                                   (uint8_t)result->messageType));
-                oledTerminal->appendLine("INVALID_MESSAGE_TYPE");
+                char msg[24];
+                snprintf(msg, 24, "Invalid message type: %d",
+                         (uint8_t)result->messageType);
+
+                oledTerminal->appendLine(msg);
                 break;
             }
         }
@@ -132,7 +136,7 @@ void setup() {
         }
     }
 
-    oledTerminal->appendLine("ROUTER_STARTED");
+    oledTerminal->appendLine("Router started.");
     oledTerminal->draw();
 }
 
@@ -140,11 +144,11 @@ void loop() {
     currentTime = millis();
 
     if (currentTime - lastAction >= 1000) {
-        Serial.println(
-            "===============================================================");
-        Serial.printf("HeapMemory: %d\n", ESP.getHeapSize());
-        Serial.println(
-            "===============================================================");
+        LOG(Serial.println(
+            "==============================================================="));
+        LOG(Serial.printf("HeapMemory: %d\n", ESP.getHeapSize()));
+        LOG(Serial.println(
+            "==============================================================="));
         lastAction = currentTime;
     }
 

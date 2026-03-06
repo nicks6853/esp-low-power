@@ -35,10 +35,10 @@ enum class MessageType : uint8_t {
  * Represents a device in Home Assistant's MQTT integration
  */
 struct HADevice {
-    char ids[17];    // deviceid -- uuid is typically 16 bytes long
-    char name[256];  // name
-    char mf[256];    // manufacturer
-    char mdl[32];    // model
+    char ids[17];   // deviceid -- uuid is typically 16 bytes long
+    char name[32];  // name
+    char mf[32];    // manufacturer
+    char mdl[32];   // model
 };
 
 /**
@@ -57,9 +57,9 @@ struct HAComponentOptions {
  * Represents an origin in Home Assistant's MQTT integration.
  */
 struct HAOrigin {
-    char name[256];  // name
-    char sw[32];     // sw_version
-    char url[256];   // support_url
+    char name[32];  // name
+    char sw[32];    // sw_version
+    char url[32];   // support_url
 };
 
 /**
@@ -88,7 +88,7 @@ struct HADiscoveryPayload {
  */
 template <typename T>
 struct HAStateUpdate {
-    char topic[128];  // MQTT topic to publish state to
+    char topic[62];  // MQTT topic to publish state to
     T value;
 };
 
