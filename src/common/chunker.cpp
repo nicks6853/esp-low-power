@@ -5,9 +5,10 @@
  * @param destinationMac The MAC address of the ESPNOW recipient.
  * @param payload The bytes to send over ESPNOW.
  * @param len The length of the byte array to send over ESPNOW.
+ * @return The amount of chunks sent
  */
-void EspNowChunker::send(uint8_t* destinationMac, uint8_t* payload,
-                         size_t len) {
+uint8_t EspNowChunker::send(uint8_t* destinationMac, uint8_t* payload,
+                            size_t len) {
     uint8_t checksum = this->_calculateChecksum(payload, len);
     size_t currentChunkSize;
     size_t remainingSize;
@@ -33,6 +34,8 @@ void EspNowChunker::send(uint8_t* destinationMac, uint8_t* payload,
 
         esp_now_send(destinationMac, (uint8_t*)&chunk, sizeof(chunk));
     }
+
+    return totalChunks;
 }
 
 /**

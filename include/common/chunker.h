@@ -27,6 +27,6 @@ class EspNowChunker {
     uint32_t _generateId();
 
    public:
-    void send(uint8_t* destinationMac, uint8_t* payload, size_t len);
+    uint8_t send(uint8_t* destinationMac, uint8_t* payload, size_t len);
 };
 #endif

@@ -14,13 +14,15 @@
 BME280I2C bme;
 unsigned long lastReading = 0;
 EspNowChunker chunker;
+uint8_t sendCount = 0;
 
 uint8_t destinationMac[] = {0xD4, 0x8A, 0xFC, 0xA8, 0xA3, 0x24};
 
 /**
  * @brief read temperature from the connected BME280
+ * @return The number of chunks sent by the chunker.
  */
-void sendTemperature() {
+uint8_t sendTemperature() {
     float temperature = bme.temp();
     Serial.printf("Temperature read: %.2f°C\n", temperature);
 
@@ -37,11 +39,14 @@ void sendTemperature() {
 
     msg->payload.stateUpdateF = state;
 
-    chunker.send(destinationMac, (uint8_t*)msg, sizeof(HAMessage));
+    uint8_t chunksSent =
+        chunker.send(destinationMac, (uint8_t*)msg, sizeof(HAMessage));
     delete msg;
+
+    return chunksSent;
 }
 
-void sendHumidity() {
+uint8_t sendHumidity() {
     float humidity = bme.hum();
     Serial.printf("Humidity read: %.2f%%\n", humidity);
 
@@ -58,11 +63,14 @@ void sendHumidity() {
 
     msg->payload.stateUpdateF = state;
 
-    chunker.send(destinationMac, (uint8_t*)msg, sizeof(HAMessage));
+    uint8_t chunksSent =
+        chunker.send(destinationMac, (uint8_t*)msg, sizeof(HAMessage));
     delete msg;
+
+    return chunksSent;
 }
 
-void createDevice() {
+uint8_t createDevice() {
     Serial.println("Adding device");
 
     // =========== Initialize Device =========== //
@@ -111,15 +119,19 @@ void createDevice() {
     msg->messageType = MessageType::DISCOVERY_PAYLOAD;
     msg->payload.discovery = discoveryPayload;
 
-    chunker.send(destinationMac, (uint8_t*)msg, sizeof(*msg));
+    uint8_t chunksSent =
+        chunker.send(destinationMac, (uint8_t*)msg, sizeof(*msg));
 
     delete device;
     delete origin;
     delete[] components;
+
+    return chunksSent;
 }
 
 void sendCallback(uint8_t* mac __attribute__((unused)), uint8_t sendStatus) {
     LOG(Serial.printf("Last message sent status: %d\n", sendStatus));
+    sendCount++;
 }
 
 uint8_t initializeEspNow() {
@@ -165,30 +177,39 @@ void initializeBme() {
 }
 
 void setup() {
+#if defined(DEBUG) && DEBUG == 1
     Serial.begin(ESP_BAUD_RATE);
     while (!Serial);
-    Serial.println("Serial ready!");
+    LOG(Serial.println("Serial ready!"));
+#endif
+
+    uint8_t totalChunks = 0;
 
     // Set the random seed
     randomSeed(analogRead(A0) + micros());
-
     initializeBme();
-
     initializeEspNow();
 
-    // Send the discovery message for Home Assistant
-    createDevice();
-}
+    rst_info* resetInfo = ESP.getResetInfoPtr();
 
-void loop() {
-    // espNowManager->autopair();
-
-    unsigned long currentTime = millis();
-
-    if (currentTime - lastReading >= 5000) {
+    // If this is a deep-sleep wake cycle
+    if (resetInfo->reason == REASON_DEEP_SLEEP_AWAKE) {
         // Send temperature and humidity over ESPNOW
-        sendTemperature();
-        sendHumidity();
-        lastReading = currentTime;
+        totalChunks += sendTemperature();
+        totalChunks += sendHumidity();
+    } else {
+        // This is first power-up, send discovery message
+        totalChunks += createDevice();
     }
+
+    // Wait for all chunks to have been sent by ESPNOW
+    while (sendCount < totalChunks) {
+        delay(1);
+    }
+
+    // Go to sleep for 5 seconds. Zzz...
+    LOG(Serial.println("Going to sleep..."));
+    ESP.deepSleep(5e6);
 }
+
+void loop() {}
