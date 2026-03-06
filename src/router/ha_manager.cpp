@@ -183,3 +183,11 @@ uint8_t HAManager::publishStateUpdate(HAStateUpdate<bool> stateUpdate) {
     this->_mqttClient.publish(stateUpdate.topic, strValue);
     return 1;
 }
+
+uint8_t HAManager::publishStateUpdate(HAStateUpdate<char[128]> stateUpdate) {
+    Serial.printf("Publishing state %s to topic %s\n", stateUpdate.value,
+                  stateUpdate.topic);
+
+    this->_mqttClient.publish(stateUpdate.topic, stateUpdate.value);
+    return 1;
+}

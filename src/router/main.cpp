@@ -32,20 +32,12 @@ void processSerial() {
         Serial.println("Forwarding result to Home Assistant");
         switch (result->messageType) {
             case MessageType::DISCOVERY_PAYLOAD: {
-                LOG(Serial.printf("%s", result->payload.discovery.dev.mdl));
-                LOG(Serial.printf("%s", result->payload.discovery.origin.name));
-                LOG(Serial.printf("%d", result->payload.discovery.cmpCount));
-                LOG(Serial.printf("%s", result->payload.discovery.cmps[0].key));
-                LOG(Serial.printf(
-                    "%s", result->payload.discovery.cmps[0].value.name));
-                LOG(Serial.printf(
-                    "%s", result->payload.discovery.cmps[0].value.stat_t));
                 if (homeAssistant.discovery(result->payload.discovery)) {
                     LOG(Serial.println("Published discovery successfully"));
-                    oledTerminal->appendLine("Discovery");
+                    oledTerminal->appendLine("DISCOVERY_SENT");
                 } else {
                     LOG(Serial.println("Failed to publish discovery"));
-                    oledTerminal->appendLine("Failed Discovery");
+                    oledTerminal->appendLine("DISCOVERY_FAILED");
                 }
                 break;
             }
@@ -53,23 +45,60 @@ void processSerial() {
                 if (homeAssistant.publishStateUpdate(
                         result->payload.stateUpdateF)) {
                     LOG(Serial.println("Published state update successfully"));
-                    char msg[21];
-                    snprintf(msg, 21, "State Update: %.2f",
-                             result->payload.stateUpdateF.value);
-
+                    char msg[32];
+                    snprintf(msg, 32, "%s", result->payload.stateUpdateF.topic);
                     oledTerminal->appendLine(msg);
                 } else {
                     LOG(Serial.printf(
                         "Failed to publish state update of type %d\n",
                         (uint8_t)result->messageType));
-                    oledTerminal->appendLine("Failed State Update");
+                    char msg[32];
+                    snprintf(msg, 32, "!%s",
+                             result->payload.stateUpdateF.topic);
+                    oledTerminal->appendLine(msg);
+                }
+                break;
+            }
+            case MessageType::STATE_UPDATE_INT: {
+                if (homeAssistant.publishStateUpdate(
+                        result->payload.stateUpdateI)) {
+                    LOG(Serial.println("Published state update successfully"));
+                    char msg[32];
+                    snprintf(msg, 32, "%s", result->payload.stateUpdateI.topic);
+                    oledTerminal->appendLine(msg);
+                } else {
+                    LOG(Serial.printf(
+                        "Failed to publish state update of type %d\n",
+                        (uint8_t)result->messageType));
+                    char msg[32];
+                    snprintf(msg, 32, "!%s",
+                             result->payload.stateUpdateI.topic);
+                    oledTerminal->appendLine(msg);
+                }
+                break;
+            }
+            case MessageType::STATE_UPDATE_CHAR_128: {
+                if (homeAssistant.publishStateUpdate(
+                        result->payload.stateUpdateS)) {
+                    LOG(Serial.println("Published state update successfully"));
+                    char msg[32];
+                    snprintf(msg, 32, "%s", result->payload.stateUpdateS.topic);
+                    oledTerminal->appendLine(msg);
+                } else {
+                    LOG(Serial.printf(
+                        "Failed to publish state update of type %d\n",
+                        (uint8_t)result->messageType));
+                    char msg[32];
+                    snprintf(msg, 32, "!%s",
+                             result->payload.stateUpdateS.topic);
+                    oledTerminal->appendLine(msg);
                 }
                 break;
             }
             default: {
                 LOG(Serial.printf("Unhandled message type %d",
                                   (uint8_t)result->messageType));
-                oledTerminal->appendLine("Unhandled");
+                oledTerminal->appendLine("INVALID_MESSAGE_TYPE");
                 break;
             }
         }
@@ -103,7 +132,7 @@ void setup() {
         }
     }
 
-    oledTerminal->appendLine("Router started");
+    oledTerminal->appendLine("ROUTER_STARTED");
     oledTerminal->draw();
 }
 
